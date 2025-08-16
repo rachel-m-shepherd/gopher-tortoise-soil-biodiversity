@@ -1,0 +1,2617 @@
+---
+title: "Gopher Tortoise Soil Biodiversity"
+author: "Rachel Shepherd"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+#About the analyses
+
+These analyses are coupled with the manuscript "Gopher Tortoise Influence on Soil Biodiversity in habitats of Differing Quality". 
+
+##Load in packages 
+```{r packages}
+library(mctoolsr)
+library(tidyverse)
+library(emmeans)
+library(lme4)
+library(lmerTest)
+library(effectsize)
+library(corrplot)
+library(vegan)
+```
+
+##Load in data
+Here we are using mctoolsr to manage the data
+link to the source code: 
+https://github.com/leffj/mctoolsr
+
+The resulting files from the function load_taxa_table() are large lists. 
+Each of these files is connected by matching sample IDs and taxonomy (ASV ID). 
+Here is a breakdown of each file:  
+data_loaded = ASV ID (row names) by sample ID (column names)  
+map_loaded = sample ID (row names) by metadata attributes (column names)  
+taxonomy_loaded = ASV ID (row names) by taxonomic strings (column names)  
+
+```{r data}
+# call .txt files
+tax_table_nem = 'nem_asv_gt.txt'
+tax_table_bact= 'bact_asv_gt.txt'
+tax_table_fung= 'fung_asv_gt.txt'
+tax_table_prot = 'prot_asv_gt_n.txt'
+map_fp = 'metadata_gt_f.txt'
+
+# load and filter for each broad group
+input_nem = load_taxa_table(tax_table_nem, map_fp)
+input_nem$map_loaded$sampleID <- row.names(input_nem$map_loaded)
+input_nem_ra = convert_to_relative_abundances(input_nem)
+
+input_bact = load_taxa_table(tax_table_bact, map_fp)
+input_bact$map_loaded$sampleID <- row.names(input_bact$map_loaded)
+input_bact_ra = convert_to_relative_abundances(input_bact)
+input_bact_ra = filter_taxa_from_input(input_bact_ra, taxa_to_remove = "mitochondria")
+input_bact_ra = filter_taxa_from_input(input_bact_ra, taxa_to_remove = "Chloroplast")
+
+input_fung = load_taxa_table(tax_table_fung, map_fp)
+input_fung$map_loaded$sampleID <- row.names(input_fung$map_loaded)
+input_fung_ra = convert_to_relative_abundances(input_fung)
+
+
+input_prot = load_taxa_table(tax_table_prot, map_fp)
+input_prot$map_loaded$sampleID <- row.names(input_prot$map_loaded)
+input_prot_ra = convert_to_relative_abundances(input_prot)
+
+#plant data
+plant_wide_n<-read.csv("plant_data_wide.csv", row.names = 1)
+```
+
+##First analyses: look at metadata (abiotic factors)
+###Checking for correlations between factors
+```{r correlation check}
+# using the map loaded from the nematode large file
+map = input_nem_ra$map_loaded
+
+cormap<-map[,7:41]
+M=cor(cormap,use="pairwise.complete.obs")
+corrplot(M, method = 'number', type = 'upper',number.cex = 0.30,tl.cex = 0.75)
+```
+###After deciding which factors to keep, run linear models and make figures
+```{r abiotic models and figures}
+# go through all variables using lmer and anova (make figures for significant factors)
+# pH
+pH.lm = lmer(Soil.pH ~ habitat*gopher_tortoise_activity +(1|site), data = map)
+anova(pH.lm)
+emmeans(pH.lm, pairwise~habitat*gopher_tortoise_activity)
+
+# plot
+map$treatment = factor(map$treatment, 
+                    levels = c("IntactBurrowing", "IntactForaging", "DegradedBurrowing", "DegradedForaging"))
+
+
+ggplot(map, aes(x = treatment, y = Soil.pH)) +
+  geom_boxplot(aes(fill = treatment), outlier.shape = NA,
+               color = c("black")) +    
+  geom_jitter(aes(fill = treatment),
+              alpha = 0.8,
+              shape = 21,
+              size = 3,
+              set.seed(666),
+              color = "black") +
+  scale_fill_manual(values = c("khaki", "green4","khaki","green4")) +
+  labs(x = NULL,
+       y = "pH",
+       title = NULL) +
+  theme_classic() +
+  theme(legend.position = "none") +
+  theme(plot.title = element_text(hjust = 0.5))
+
+# Organic Matter
+OM.lm = lmer(Organic.Matter ~ habitat*gopher_tortoise_activity +(1|site), data = map)
+anova(OM.lm)
+emmeans(OM.lm, pairwise~habitat*gopher_tortoise_activity)
+
+# plot
+map$treatment = factor(map$treatment, 
+                 levels = c("IntactBurrowing", "IntactForaging", "DegradedBurrowing", "DegradedForaging"))
+
+
+ggplot(map, aes(x = treatment, y = Organic.Matter)) +
+  geom_boxplot(aes(fill = treatment), outlier.shape = NA,
+               color = c("black")) +    
+  geom_jitter(aes(fill = treatment),
+              alpha = 0.8,
+              shape = 21,
+              size = 3,
+              set.seed(666),
+              color = "black") +
+  scale_fill_manual(values = c("khaki", "green4","khaki","green4")) +
+  labs(x = NULL,
+       y = "Organic Matter",
+       title = NULL) +
+  theme_classic() +
+  theme(legend.position = "none") +
+  theme(plot.title = element_text(hjust = 0.5))
+
+# Organic C
+oC.lm = lmer(Total.Organic.C ~ habitat*gopher_tortoise_activity +(1|site), data = map)
+anova(oC.lm)
+emmeans(oC.lm, pairwise~habitat*gopher_tortoise_activity)
+
+# plot
+map$treatment = factor(map$treatment, 
+                 levels = c("IntactBurrowing", "IntactForaging", "DegradedBurrowing", "DegradedForaging"))
+
+
+ggplot(map, aes(x = treatment, y = Total.Organic.C)) +
+  geom_boxplot(aes(fill = treatment), outlier.shape = NA,
+               color = c("black")) +    
+  geom_jitter(aes(fill = treatment),
+              alpha = 0.8,
+              shape = 21,
+              size = 3,
+              set.seed(666),
+              color = "black") +
+  scale_fill_manual(values = c("khaki", "green4","khaki","green4")) +
+  labs(x = NULL,
+       y = "Organic Carbon",
+       title = NULL) +
+  theme_classic() +
+  theme(legend.position = "none") +
+  theme(plot.title = element_text(hjust = 0.5))
+
+# NO3
+NO3.lm = lmer(Nitrate ~ habitat*gopher_tortoise_activity +(1|site), data = map)
+anova(NO3.lm)
+emmeans(NO3.lm, pairwise~habitat*gopher_tortoise_activity)
+
+# plot
+map$treatment = factor(map$treatment, 
+                 levels = c("IntactBurrowing", "IntactForaging", "DegradedBurrowing", "DegradedForaging"))
+
+
+ggplot(map, aes(x = treatment, y = Nitrate)) +
+  geom_boxplot(aes(fill = treatment), outlier.shape = NA,
+               color = c("black")) +    
+  geom_jitter(aes(fill = treatment),
+              alpha = 0.8,
+              shape = 21,
+              size = 3,
+              set.seed(666),
+              color = "black") +
+  scale_fill_manual(values = c("khaki", "green4","khaki","green4")) +
+  labs(x = NULL,
+       y = "NO3",
+       title = NULL) +
+  theme_classic() +
+  theme(legend.position = "none") +
+  theme(plot.title = element_text(hjust = 0.5))
+
+# NH4
+NH4.lm = lmer(Ammonium ~ habitat*gopher_tortoise_activity +(1|site), data = map)
+anova(NH4.lm)
+emmeans(NH4.lm, pairwise~habitat*gopher_tortoise_activity)
+
+# plot
+map$treatment = factor(map$treatment, 
+                 levels = c("IntactBurrowing", "IntactForaging", "DegradedBurrowing", "DegradedForaging"))
+
+
+ggplot(map, aes(x = treatment, y = Ammonium)) +
+  geom_boxplot(aes(fill = treatment), outlier.shape = NA,
+               color = c("black")) +    
+  geom_jitter(aes(fill = treatment),
+              alpha = 0.8,
+              shape = 21,
+              size = 3,
+              set.seed(666),
+              color = "black") +
+  scale_fill_manual(values = c("khaki", "green4","khaki","green4")) +
+  labs(x = NULL,
+       y = "NH4",
+       title = NULL) +
+  theme_classic() +
+  theme(legend.position = "none") +
+  theme(plot.title = element_text(hjust = 0.5))
+
+# Total P
+tP.lm = lmer(Total.Phosphorus ~ habitat*gopher_tortoise_activity +(1|site), data = map)
+anova(tP.lm)
+emmeans(tP.lm, pairwise~habitat*gopher_tortoise_activity)
+
+# plot
+map$treatment = factor(map$treatment, 
+                 levels = c("IntactBurrowing", "IntactForaging", "DegradedBurrowing", "DegradedForaging"))
+
+
+ggplot(map, aes(x = treatment, y = Total.Phosphorus)) +
+  geom_boxplot(aes(fill = treatment), outlier.shape = NA,
+               color = c("black")) +    
+  geom_jitter(aes(fill = treatment),
+              alpha = 0.8,
+              shape = 21,
+              size = 3,
+              set.seed(666),
+              color = "black") +
+  scale_fill_manual(values = c("khaki", "green4","khaki","green4")) +
+  labs(x = NULL,
+       y = "Total Phosphorus",
+       title = NULL) +
+  theme_classic() +
+  theme(legend.position = "none") +
+  theme(plot.title = element_text(hjust = 0.5))
+
+# H2O
+H2O.lm = lmer(Percent.Moisture ~ habitat*gopher_tortoise_activity +(1|site), data = map)
+anova(H2O.lm)
+emmeans(H2O.lm, pairwise~habitat*gopher_tortoise_activity)
+
+# plot
+map$treatment = factor(map$treatment, 
+                 levels = c("IntactBurrowing", "IntactForaging", "DegradedBurrowing", "DegradedForaging"))
+
+
+ggplot(map, aes(x = treatment, y = Percent.Moisture)) +
+  geom_boxplot(aes(fill = treatment), outlier.shape = NA,
+               color = c("black")) +    
+  geom_jitter(aes(fill = treatment),
+              alpha = 0.8,
+              shape = 21,
+              size = 3,
+              set.seed(666),
+              color = "black") +
+  scale_fill_manual(values = c("khaki", "green4","khaki","green4")) +
+  labs(x = NULL,
+       y = "Soil Moisture",
+       title = NULL) +
+  theme_classic() +
+  theme(legend.position = "none") +
+  theme(plot.title = element_text(hjust = 0.5))
+
+# Ca
+Ca.lm = lmer(Calcium ~ habitat*gopher_tortoise_activity +(1|site), data = map)
+anova(Ca.lm)
+emmeans(Ca.lm, pairwise~habitat*gopher_tortoise_activity)
+
+# plot
+map$treatment = factor(map$treatment, 
+                 levels = c("IntactBurrowing", "IntactForaging", "DegradedBurrowing", "DegradedForaging"))
+
+
+ggplot(map, aes(x = treatment, y = Calcium)) +
+  geom_boxplot(aes(fill = treatment), outlier.shape = NA,
+               color = c("black")) +    
+  geom_jitter(aes(fill = treatment),
+              alpha = 0.8,
+              shape = 21,
+              size = 3,
+              set.seed(666),
+              color = "black") +
+  scale_fill_manual(values = c("khaki", "green4","khaki","green4")) +
+  labs(x = NULL,
+       y = "Calcium",
+       title = NULL) +
+  theme_classic() +
+  theme(legend.position = "none") +
+  theme(plot.title = element_text(hjust = 0.5))
+```
+##Analyses for the plant communities
+###Alpha diversity
+```{r plant alpha diversity}
+# pull out mapping/metadata info
+plant_mapping <- plant_wide_n[,1:4]
+
+#rotate for diversity calculations
+div_calcs <- as.data.frame(t(plant_wide_n))
+colnames(div_calcs) <- div_calcs[1,]
+div_calcs_f <- div_calcs[5:88,]
+div_calcs_f[1:89] <- as.numeric(unlist(div_calcs_f[1:89]))
+
+plant_div = calc_diversity(div_calcs_f, metric = "shannon")                   
+plant_rich = calc_diversity(div_calcs_f, metric = "richness")
+
+plant_mapping$plant_div = plant_div
+plant_mapping$plant_rich = plant_rich
+
+# Plant Diversity
+Plant.div.lm = lmer(plant_div ~ habitat + (1|site), data = plant_mapping)
+anova(Plant.div.lm)
+
+# Plant Rich
+Plant.rich.lm = lmer(plant_rich ~ habitat +(1|site), data = plant_mapping)
+anova(Plant.rich.lm)
+emmeans(Plant.rich.lm, pairwise~habitat)
+
+# plot
+plant_mapping$habitat = factor(plant_mapping$habitat, 
+                 levels = c("Intact", "Degraded"))
+
+ggplot(plant_mapping, aes(x = habitat, y = plant_div)) +
+  geom_boxplot(aes(fill = habitat), outlier.shape = NA,
+               color = c("black")) +    
+  geom_jitter(aes(fill = habitat),
+              alpha = 0.8,
+              shape = 21,
+              size = 3,
+              set.seed(666),
+              color = "black") +
+  scale_fill_manual(values = c("green4","green4")) +
+  labs(x = NULL,
+       y = "Shannon Diversity",
+       title = NULL) +
+  theme_classic() +
+  theme(legend.position = "none") +
+  theme(plot.title = element_text(hjust = 0.5))
+
+
+ggplot(plant_mapping, aes(x = habitat, y = plant_rich)) +
+  geom_boxplot(aes(fill = habitat), outlier.shape = NA,
+               color = c("black")) +    
+  geom_jitter(aes(fill = habitat),
+              alpha = 0.8,
+              shape = 21,
+              size = 3,
+              set.seed(666),
+              color = "black") +
+  scale_fill_manual(values = c("green4","green4")) +
+  labs(x = NULL,
+       y = "Richness",
+       title = NULL) +
+  theme_classic() +
+  theme(legend.position = "none") +
+  theme(plot.title = element_text(hjust = 0.5))
+```
+###Beta diversity
+```{r plant beta diversity}
+## plant ndms
+ord_plant <- metaMDS(t(div_calcs_f), distance = "bray", k = 3,
+                   trymax = 200)
+stressplot(ord_plant)
+nmds1 <- ord_plant$points[,1]
+nmds2 <- ord_plant$points[,2]
+ord_plant_plot <- as.data.frame(cbind(nmds1,nmds2))
+
+
+plant_mapping$site = factor(plant_mapping$site, 
+                                     levels = c("1", "2", "3", "4",
+                                                "5", "6", "7", "8", "9",
+                                                "10", "11", "12", "13", "14", "15"))
+
+# run permanova
+plant_dist_bray <- vegdist(t(div_calcs_f), method = "euclidean", diag = FALSE, upper = TRUE,na.rm = TRUE)
+
+with(plant_mapping, adonis2(plant_dist_bray ~ habitat, data = plant_mapping, permutations = 199, strata = site, by = "terms"))
+
+
+# plot
+plant_mapping$habitat = factor(plant_mapping$habitat, 
+                                     levels = c("Intact", "Degraded"))
+
+ggplot(ord_plant_plot, aes(nmds1, nmds2, group = plant_mapping$habitat)) +
+  geom_point(aes(shape = plant_mapping$habitat),
+             size = 4, 
+             stroke=0.25,
+             fill = "green4") +
+  scale_shape_manual(values = c(21,25)) +
+  theme_classic() + 
+  labs(x="NMDS 1", y="NMDS 2") 
+```
+##Analyses for soil alpha diversity metrics 
+##Starting with microbial alpha diversity analyses
+```{r microbial alhpa diversity models and figures}
+# make new map file
+map = input_nem_ra$map_loaded
+# calculate diversity metrics and add to nematode mapping file
+bact_rich = calc_diversity(input_bact_ra$data_loaded, metric = 'richness')
+bact_div = calc_diversity(input_bact_ra$data_loaded, metric = 'shannon')
+map$bact_rich = bact_rich
+map$bact_div = bact_div
+fung_rich = calc_diversity(input_fung_ra$data_loaded, metric = 'richness')
+fung_div = calc_diversity(input_fung_ra$data_loaded, metric = 'shannon')
+map$fung_rich = fung_rich
+map$fung_div = fung_div
+prot_rich = calc_diversity(input_prot_ra$data_loaded, metric = 'richness')
+prot_div = calc_diversity(input_prot_ra$data_loaded, metric = 'shannon')
+map$prot_rich = prot_rich 
+map$prot_div = prot_div
+
+# linear models for richness and shannon diversity
+bact.rich.lm = lmer(bact_rich ~ habitat*gopher_tortoise_activity +(1|site), data = map)
+anova(bact.rich.lm)
+emmeans(bact.rich.lm, pairwise~habitat*gopher_tortoise_activity)
+
+bact.div.lm = lmer(bact_div ~ habitat*gopher_tortoise_activity +(1|site), data = map)
+anova(bact.div.lm)
+emmeans(bact.div.lm, pairwise~habitat*gopher_tortoise_activity)
+
+fung.rich.lm = lmer(fung_rich ~ habitat*gopher_tortoise_activity +(1|site), data = map)
+anova(fung.rich.lm)
+emmeans(fung.rich.lm, pairwise~habitat*gopher_tortoise_activity)
+
+fung.div.lm = lmer(fung_div ~ habitat*gopher_tortoise_activity +(1|site), data = map)
+anova(fung.div.lm)
+emmeans(fung.div.lm, pairwise~habitat*gopher_tortoise_activity)
+
+# exclude outlier protist sample from analyses
+protist_set_for_alpha_div = map %>%
+  filter(sampleID != "S.9.A_F")
+prot.rich.lm = lmer(prot_rich ~ habitat*gopher_tortoise_activity +(1|site), data = protist_set_for_alpha_div)
+anova(prot.rich.lm)
+emmeans(prot.rich.lm, pairwise~habitat*gopher_tortoise_activity)
+
+prot.div.lm = lmer(prot_div ~ habitat*gopher_tortoise_activity +(1|site), data = protist_set_for_alpha_div)
+anova(prot.div.lm)
+emmeans(prot.div.lm, pairwise~habitat*gopher_tortoise_activity)
+
+# plot
+map$treatment = factor(map$treatment, 
+                 levels = c("IntactBurrowing", "IntactForaging", "DegradedBurrowing", "DegradedForaging"))
+
+#plot bacterial richness
+ggplot(map, aes(x = treatment, y = bact_rich)) +
+  geom_boxplot(aes(fill = treatment), outlier.shape = NA,
+               color = c("black")) +    
+  geom_jitter(aes(fill = treatment),
+              alpha = 0.8,
+              shape = 21,
+              size = 3,
+              set.seed(666),
+              color = "black") +
+  scale_fill_manual(values = c("khaki", "green4","khaki","green4")) +
+  labs(x = NULL,
+       y = "Richness",
+       title = "Bacteria") +
+  theme_classic() +
+  theme(legend.position = "none") +
+  theme(plot.title = element_text(hjust = 0.5))
+
+
+#plot bacterial diversity
+ggplot(map, aes(x = treatment, y = bact_div)) +
+  geom_boxplot(aes(fill = treatment), outlier.shape = NA,
+               color = c("black")) +    
+  geom_jitter(aes(fill = treatment),
+              alpha = 0.8,
+              shape = 21,
+              size = 3,
+              set.seed(666),
+              color = "black") +
+  scale_fill_manual(values = c("khaki", "green4","khaki","green4")) +
+  labs(x = NULL,
+       y = "Shannon Diversity",
+       title = "Bacteria") +
+  theme_classic() +
+  theme(legend.position = "none") +
+  theme(plot.title = element_text(hjust = 0.5))
+
+#plot fungal richness
+ggplot(map, aes(x = treatment, y = fung_rich)) +
+  geom_boxplot(aes(fill = treatment), outlier.shape = NA,
+               color = c("black")) +    
+  geom_jitter(aes(fill = treatment),
+              alpha = 0.8,
+              shape = 21,
+              size = 3,
+              set.seed(666),
+              color = "black") +
+  scale_fill_manual(values = c("khaki", "green4","khaki","green4")) +
+  labs(x = NULL,
+       y = "Richness",
+       title = "Fungi") +
+  theme_classic() +
+  theme(legend.position = "none") +
+  theme(plot.title = element_text(hjust = 0.5))
+
+
+#plot fungal diversity
+ggplot(map, aes(x = treatment, y = fung_div)) +
+  geom_boxplot(aes(fill = treatment), outlier.shape = NA,
+               color = c("black")) +    
+  geom_jitter(aes(fill = treatment),
+              alpha = 0.8,
+              shape = 21,
+              size = 3,
+              set.seed(666),
+              color = "black") +
+  scale_fill_manual(values = c("khaki", "green4","khaki","green4")) +
+  labs(x = NULL,
+       y = "Shannon Diversity",
+       title = "Fungi") +
+  theme_classic() +
+  theme(legend.position = "none") +
+  theme(plot.title = element_text(hjust = 0.5))
+
+#plot protist richness
+map %>% 
+  filter(sampleID != "S.9.A_F") %>%
+ggplot(aes(x = treatment, y = prot_rich)) +
+  geom_boxplot(aes(fill = treatment), outlier.shape = NA,
+               color = c("black")) +    
+  geom_jitter(aes(fill = treatment),
+              alpha = 0.8,
+              shape = 21,
+              size = 3,
+              set.seed(666),
+              color = "black") +
+  scale_fill_manual(values = c("khaki", "green4","khaki","green4")) +
+  labs(x = NULL,
+       y = "Richness",
+       title = "Protist") +
+  theme_classic() +
+  theme(legend.position = "none") +
+  theme(plot.title = element_text(hjust = 0.5))
+
+
+#plot protist diversity
+map %>% 
+  filter(sampleID != "S.9.A_F") %>%
+ggplot(aes(x = treatment, y = prot_div)) +
+  geom_boxplot(aes(fill = treatment), outlier.shape = NA,
+               color = c("black")) +    
+  geom_jitter(aes(fill = treatment),
+              alpha = 0.8,
+              shape = 21,
+              size = 3,
+              set.seed(666),
+              color = "black") +
+  scale_fill_manual(values = c("khaki", "green4","khaki","green4")) +
+  labs(x = NULL,
+       y = "Shannon Diversity",
+       title = "Protist") +
+  theme_classic() +
+  theme(legend.position = "none") +
+  theme(plot.title = element_text(hjust = 0.5))
+```
+##Look at the effect size of gopher tortoise activity on diversity
+```{r microbial alpha diversity effect sizes}
+# bacteria
+bact_map_intact = map %>%
+  filter(habitat == "Intact")
+bact_map_intact$gopher_tortoise_activity = factor(bact_map_intact$gopher_tortoise_activity, 
+                                levels = c("Foraging", "Burrowing"))
+
+cohens_d(bact_rich ~ gopher_tortoise_activity, data = bact_map_intact)
+cohens_d(bact_div ~ gopher_tortoise_activity, data = bact_map_intact)
+
+bact_map_degraded = map %>%
+  filter(habitat == "Degraded")
+bact_map_degraded$gopher_tortoise_activity = factor(bact_map_degraded$gopher_tortoise_activity, 
+                                  levels = c("Foraging", "Burrowing"))
+
+cohens_d(bact_rich ~ gopher_tortoise_activity, data = bact_map_degraded)
+cohens_d(bact_div ~ gopher_tortoise_activity, data = bact_map_degraded)
+
+# fungi
+fung_map_intact = map %>%
+  filter(habitat == "Intact")
+fung_map_intact$gopher_tortoise_activity = factor(fung_map_intact$gopher_tortoise_activity, 
+                                levels = c("Foraging", "Burrowing"))
+
+cohens_d(fung_rich ~ gopher_tortoise_activity, data = fung_map_intact)
+cohens_d(fung_div ~ gopher_tortoise_activity, data = fung_map_intact)
+
+fung_map_degraded = map %>%
+  filter(habitat == "Degraded")
+fung_map_degraded$gopher_tortoise_activity = factor(fung_map_degraded$gopher_tortoise_activity, 
+                                  levels = c("Foraging", "Burrowing"))
+
+cohens_d(fung_rich ~ gopher_tortoise_activity, data = fung_map_degraded)
+cohens_d(fung_div ~ gopher_tortoise_activity, data = fung_map_degraded)
+
+# protist
+prot_map_intact = map %>%
+  filter(habitat == "Intact")
+prot_map_intact$gopher_tortoise_activity = factor(prot_map_intact$gopher_tortoise_activity, 
+                                levels = c("Foraging", "Burrowing"))
+
+cohens_d(prot_rich ~ gopher_tortoise_activity, data = prot_map_intact)
+cohens_d(prot_div ~ gopher_tortoise_activity, data = prot_map_intact)
+
+prot_map_degraded = map %>%
+  filter(habitat == "Degraded")
+prot_map_degraded$gopher_tortoise_activity = factor(prot_map_degraded$gopher_tortoise_activity, 
+                                  levels = c("Foraging", "Burrowing"))
+
+cohens_d(prot_rich ~ gopher_tortoise_activity, data = prot_map_degraded)
+cohens_d(prot_div ~ gopher_tortoise_activity, data = prot_map_degraded)
+```
+##Alpha diversity for nematode trophic groups
+###run models and make figures
+```{r nematode alpha diversity models and figures}
+# Bacterial-Feeding
+BF_alpha = filter_taxa_from_input(input_nem_ra, at_spec_level = 3,
+                                  taxa_to_keep = "BF")
+BF_rich = calc_diversity(BF_alpha$data_loaded, metric = 'richness')
+BF_div = calc_diversity(BF_alpha$data_loaded, metric = 'shannon')
+
+# join to map
+BF_map = BF_alpha$map_loaded
+BF_map$BF_rich = BF_rich
+BF_map$BF_div = BF_div
+
+BF.rich.lm = lmer(BF_rich ~ gopher_tortoise_activity * habitat +(1|site), data = BF_map)
+anova(BF.rich.lm)
+emmeans(BF.rich.lm, pairwise~gopher_tortoise_activity*habitat)
+
+
+BF.div.lm = lmer(BF_div ~ gopher_tortoise_activity * habitat +(1|site), data = BF_map)
+anova(BF.div.lm)
+emmeans(BF.div.lm, pairwise~gopher_tortoise_activity*habitat)
+
+# Fungal-feeding
+FF_alpha = filter_taxa_from_input(input_nem_ra, at_spec_level = 3,
+                                  taxa_to_keep = "FF")
+FF_rich = calc_diversity(FF_alpha$data_loaded, metric = 'richness')
+FF_div = calc_diversity(FF_alpha$data_loaded, metric = 'shannon')
+
+# join to map
+FF_map = FF_alpha$map_loaded
+FF_map$FF_rich = FF_rich
+FF_map$FF_div = FF_div
+
+FF.rich.lm = lmer(FF_rich ~ gopher_tortoise_activity * habitat +(1|site), data = FF_map)
+anova(FF.rich.lm)
+emmeans(FF.rich.lm, pairwise~gopher_tortoise_activity*habitat)
+
+FF.div.lm = lmer(FF_div ~ gopher_tortoise_activity * habitat +(1|site), data = FF_map)
+anova(FF.div.lm)
+emmeans(FF.div.lm, pairwise~gopher_tortoise_activity*habitat)
+
+# Plant-parasitic
+PP_alpha = filter_taxa_from_input(input_nem_ra, at_spec_level = 3,
+                                  taxa_to_keep = "PP")
+PP_rich = calc_diversity(PP_alpha$data_loaded, metric = 'richness')
+PP_div = calc_diversity(PP_alpha$data_loaded, metric = 'shannon')
+
+# join to map
+PP_map = PP_alpha$map_loaded
+PP_map$PP_rich = PP_rich
+PP_map$PP_div = PP_div
+
+PP.rich.lm = lmer(PP_rich ~ gopher_tortoise_activity * habitat +(1|site), data = PP_map)
+anova(PP.rich.lm)
+emmeans(PP.rich.lm, pairwise~gopher_tortoise_activity*habitat)
+
+PP.div.lm = lmer(PP_div ~ gopher_tortoise_activity * habitat +(1|site), data = PP_map)
+anova(PP.div.lm)
+emmeans(PP.div.lm, pairwise~gopher_tortoise_activity*habitat)
+
+# Omnivorous
+OM_alpha = filter_taxa_from_input(input_nem_ra, at_spec_level = 3,
+                                  taxa_to_keep = "OM")
+OM_rich = calc_diversity(OM_alpha$data_loaded, metric = 'richness')
+OM_div = calc_diversity(OM_alpha$data_loaded, metric = 'shannon')
+
+# join to map
+OM_map = OM_alpha$map_loaded
+OM_map$OM_rich = OM_rich
+OM_map$OM_div = OM_div
+
+OM.rich.lm = lmer(OM_rich ~ gopher_tortoise_activity * habitat +(1|site), data = OM_map)
+anova(OM.rich.lm)
+emmeans(OM.rich.lm, pairwise~gopher_tortoise_activity*habitat)
+
+OM.div.lm = lmer(OM_div ~ gopher_tortoise_activity * habitat +(1|site), data = OM_map)
+anova(OM.div.lm)
+emmeans(OM.div.lm, pairwise~gopher_tortoise_activity*habitat)
+
+# Root-associated
+RA_alpha = filter_taxa_from_input(input_nem_ra, at_spec_level = 3,
+                                  taxa_to_keep = "RA")
+RA_rich = calc_diversity(RA_alpha$data_loaded, metric = 'richness')
+RA_div = calc_diversity(RA_alpha$data_loaded, metric = 'shannon')
+
+# join to map
+RA_map = RA_alpha$map_loaded
+RA_map$RA_rich = RA_rich
+RA_map$RA_div = RA_div
+
+RA.rich.lm = lmer(RA_rich ~ gopher_tortoise_activity * habitat +(1|site), data = RA_map)
+anova(RA.rich.lm)
+emmeans(RA.rich.lm, pairwise~gopher_tortoise_activity*habitat)
+
+RA.div.lm = lmer(RA_div ~ gopher_tortoise_activity * habitat +(1|site), data = RA_map)
+anova(RA.div.lm)
+emmeans(RA.div.lm, pairwise~gopher_tortoise_activity*habitat)
+
+# Plot all trophic groups
+BF_map$treatment = factor(BF_map$treatment, 
+                     levels = c("IntactBurrowing", "IntactForaging", "DegradedBurrowing", "DegradedForaging"))
+
+
+ggplot(BF_map, aes(x = treatment, y = BF_rich)) +
+  geom_boxplot(aes(fill = treatment), outlier.shape = NA,
+               color = c("black")) +    
+  geom_jitter(aes(fill = treatment),
+              alpha = 0.8,
+              shape = 21,
+              size = 3,
+              set.seed(666),
+              color = "black") +
+  scale_fill_manual(values = c("khaki", "green4","khaki","green4")) +
+  labs(x = NULL,
+       y = "Richness",
+       title = "Bacterial-Feeding") +
+  theme_classic() +
+  theme(legend.position = "none") +
+  theme(plot.title = element_text(hjust = 0.5))
+
+ggplot(BF_map, aes(x = treatment, y = BF_div)) +
+  geom_boxplot(aes(fill = treatment), outlier.shape = NA,
+               color = c("black")) +    
+  geom_jitter(aes(fill = treatment),
+              alpha = 0.8,
+              shape = 21,
+              size = 3,
+              set.seed(666),
+              color = "black") +
+  scale_fill_manual(values = c("khaki", "green4","khaki","green4")) +
+  labs(x = NULL,
+       y = "Shannon Diversity",
+       title = "Bacterial-Feeding") +
+  theme_classic() +
+  theme(legend.position = "none") +
+  theme(plot.title = element_text(hjust = 0.5))
+
+FF_map$treatment = factor(FF_map$treatment, 
+                    levels = c("IntactBurrowing", "IntactForaging", "DegradedBurrowing", "DegradedForaging"))
+
+
+ggplot(FF_map, aes(x = treatment, y = FF_rich)) +
+  geom_boxplot(aes(fill = treatment), outlier.shape = NA,
+               color = c("black")) +    
+  geom_jitter(aes(fill = treatment),
+              alpha = 0.8,
+              shape = 21,
+              size = 3,
+              set.seed(666),
+              color = "black") +
+  scale_fill_manual(values = c("khaki", "green4","khaki","green4")) +
+  labs(x = NULL,
+       y = "Richness",
+       title = "Fungal-Feeding") +
+  theme_classic() +
+  theme(legend.position = "none") +
+  theme(plot.title = element_text(hjust = 0.5))
+
+ggplot(FF_map, aes(x = treatment, y = FF_div)) +
+  geom_boxplot(aes(fill = treatment), outlier.shape = NA,
+               color = c("black")) +    
+  geom_jitter(aes(fill = treatment),
+              alpha = 0.8,
+              shape = 21,
+              size = 3,
+              set.seed(666),
+              color = "black") +
+  scale_fill_manual(values = c("khaki", "green4","khaki","green4")) +
+  labs(x = NULL,
+       y = "Shannon Diversity",
+       title = "Fungal-Feeding") +
+  theme_classic() +
+  theme(legend.position = "none") +
+  theme(plot.title = element_text(hjust = 0.5))
+
+PP_map$treatment = factor(PP_map$treatment, 
+                    levels = c("IntactBurrowing", "IntactForaging", "DegradedBurrowing", "DegradedForaging"))
+
+
+ggplot(PP_map, aes(x = treatment, y = PP_rich)) +
+  geom_boxplot(aes(fill = treatment), outlier.shape = NA,
+               color = c("black")) +    
+  geom_jitter(aes(fill = treatment),
+              alpha = 0.8,
+              shape = 21,
+              size = 3,
+              set.seed(666),
+              color = "black") +
+  scale_fill_manual(values = c("khaki", "green4","khaki","green4")) +
+  labs(x = NULL,
+       y = "Richness",
+       title = "Plant-Parasitic") +
+  theme_classic() +
+  theme(legend.position = "none") +
+  theme(plot.title = element_text(hjust = 0.5))
+
+ggplot(PP_map, aes(x = treatment, y = PP_div)) +
+  geom_boxplot(aes(fill = treatment), outlier.shape = NA,
+               color = c("black")) +    
+  geom_jitter(aes(fill = treatment),
+              alpha = 0.8,
+              shape = 21,
+              size = 3,
+              set.seed(666),
+              color = "black") +
+  scale_fill_manual(values = c("khaki", "green4","khaki","green4")) +
+  labs(x = NULL,
+       y = "Shannon Diversity",
+       title = "Plant-Parasitic") +
+  theme_classic() +
+  theme(legend.position = "none") +
+  theme(plot.title = element_text(hjust = 0.5))
+
+# plot
+OM_map$treatment = factor(OM_map$treatment, 
+                    levels = c("IntactBurrowing", "IntactForaging", "DegradedBurrowing", "DegradedForaging"))
+
+
+ggplot(OM_map, aes(x = treatment, y = OM_rich)) +
+  geom_boxplot(aes(fill = treatment), outlier.shape = NA,
+               color = c("black")) +    
+  geom_jitter(aes(fill = treatment),
+              alpha = 0.8,
+              shape = 21,
+              size = 3,
+              set.seed(666),
+              color = "black") +
+  scale_fill_manual(values = c("khaki", "green4","khaki","green4")) +
+  labs(x = NULL,
+       y = "Richness",
+       title = "Omnivorous") +
+  theme_classic() +
+  theme(legend.position = "none") +
+  theme(plot.title = element_text(hjust = 0.5))
+
+ggplot(OM_map, aes(x = treatment, y = OM_div)) +
+  geom_boxplot(aes(fill = treatment), outlier.shape = NA,
+               color = c("black")) +    
+  geom_jitter(aes(fill = treatment),
+              alpha = 0.8,
+              shape = 21,
+              size = 3,
+              set.seed(666),
+              color = "black") +
+  scale_fill_manual(values = c("khaki", "green4","khaki","green4")) +
+  labs(x = NULL,
+       y = "Shannon Diversity",
+       title = "Omnivorous") +
+  theme_classic() +
+  theme(legend.position = "none") +
+  theme(plot.title = element_text(hjust = 0.5))
+
+# plot
+RA_map$treatment = factor(RA_map$treatment, 
+                    levels = c("IntactBurrowing", "IntactForaging", "DegradedBurrowing", "DegradedForaging"))
+
+
+ggplot(RA_map, aes(x = treatment, y = RA_rich)) +
+  geom_boxplot(aes(fill = treatment), outlier.shape = NA,
+               color = c("black")) +    
+  geom_jitter(aes(fill = treatment),
+              alpha = 0.8,
+              shape = 21,
+              size = 3,
+              set.seed(666),
+              color = "black") +
+  scale_fill_manual(values = c("khaki", "green4","khaki","green4")) +
+  labs(x = NULL,
+       y = "Richness",
+       title = "Root-Associated") +
+  theme_classic() +
+  theme(legend.position = "none") +
+  theme(plot.title = element_text(hjust = 0.5))
+
+
+
+ggplot(RA_map, aes(x = treatment, y = RA_div)) +
+  geom_boxplot(aes(fill = treatment), outlier.shape = NA,
+               color = c("black")) +    
+  geom_jitter(aes(fill = treatment),
+              alpha = 0.8,
+              shape = 21,
+              size = 3,
+              set.seed(666),
+              color = "black") +
+  scale_fill_manual(values = c("khaki", "green4","khaki","green4")) +
+  labs(x = NULL,
+       y = "Shannon Diversity",
+       title = "Root-Associated") +
+  theme_classic() +
+  theme(legend.position = "none") +
+  theme(plot.title = element_text(hjust = 0.5))
+
+```
+##Nematode alpha diversity effect sizes
+```{r nematode effect sizes}
+# effect size
+BF_map_intact = BF_map %>%
+  filter(habitat == "Intact")
+BF_map_intact$gopher_tortoise_activity = factor(BF_map_intact$gopher_tortoise_activity, 
+                           levels = c("Burrowing", "Foraging"))
+
+cohens_d(BF_rich ~ gopher_tortoise_activity, data = BF_map_intact)
+cohens_d(BF_div ~ gopher_tortoise_activity, data = BF_map_intact)
+
+BF_map_degraded = BF_map %>%
+  filter(habitat == "Degraded")
+BF_map_degraded$gopher_tortoise_activity = factor(BF_map_degraded$gopher_tortoise_activity, 
+                               levels = c("Burrowing", "Foraging"))
+
+cohens_d(BF_rich ~ gopher_tortoise_activity, data = BF_map_degraded)
+cohens_d(BF_div ~ gopher_tortoise_activity, data = BF_map_degraded)
+
+# effect size
+FF_map_intact = FF_map %>%
+  filter(habitat == "Intact")
+FF_map_intact$gopher_tortoise_activity = factor(FF_map_intact$gopher_tortoise_activity, 
+                               levels = c("Burrowing", "Foraging"))
+
+cohens_d(FF_rich ~ gopher_tortoise_activity, data = FF_map_intact)
+cohens_d(FF_div ~ gopher_tortoise_activity, data = FF_map_intact)
+
+FF_map_degraded = FF_map %>%
+  filter(habitat == "Degraded")
+FF_map_degraded$gopher_tortoise_activity = factor(FF_map_degraded$gopher_tortoise_activity, 
+                                 levels = c("Burrowing", "Foraging"))
+
+cohens_d(FF_rich ~ gopher_tortoise_activity, data = FF_map_degraded)
+cohens_d(FF_div ~ gopher_tortoise_activity, data = FF_map_degraded)
+
+# effect size
+PP_map_intact = PP_map %>%
+  filter(habitat == "Intact")
+PP_map_intact$gopher_tortoise_activity = factor(PP_map_intact$gopher_tortoise_activity, 
+                               levels = c("Burrowing", "Foraging"))
+
+cohens_d(PP_rich ~ gopher_tortoise_activity, data = PP_map_intact)
+cohens_d(PP_div ~ gopher_tortoise_activity, data = PP_map_intact)
+
+PP_map_degraded = PP_map %>%
+  filter(habitat == "Degraded")
+PP_map_degraded$gopher_tortoise_activity = factor(PP_map_degraded$gopher_tortoise_activity, 
+                                 levels = c("Burrowing", "Foraging"))
+
+cohens_d(PP_rich ~ gopher_tortoise_activity, data = PP_map_degraded)
+cohens_d(PP_div ~ gopher_tortoise_activity, data = PP_map_degraded)
+
+# effect size
+OM_map_intact = OM_map %>%
+  filter(habitat == "Intact")
+OM_map_intact$gopher_tortoise_activity = factor(OM_map_intact$gopher_tortoise_activity, 
+                               levels = c("Burrowing", "Foraging"))
+
+cohens_d(OM_rich ~ gopher_tortoise_activity, data = OM_map_intact)
+cohens_d(OM_div ~ gopher_tortoise_activity, data = OM_map_intact)
+
+OM_map_degraded = OM_map %>%
+  filter(habitat == "Degraded")
+OM_map_degraded$gopher_tortoise_activity = factor(OM_map_degraded$gopher_tortoise_activity, 
+                                 levels = c("Burrowing", "Foraging"))
+
+cohens_d(OM_rich ~ gopher_tortoise_activity, data = OM_map_degraded)
+cohens_d(OM_div ~ gopher_tortoise_activity, data = OM_map_degraded)
+
+# effect size
+RA_map_intact = RA_map %>%
+  filter(habitat == "Intact")
+RA_map_intact$gopher_tortoise_activity = factor(RA_map_intact$gopher_tortoise_activity, 
+                               levels = c("Burrowing", "Foraging"))
+
+cohens_d(RA_rich ~ gopher_tortoise_activity, data = RA_map_intact)
+cohens_d(RA_div ~ gopher_tortoise_activity, data = RA_map_intact)
+
+RA_map_degraded = RA_map %>%
+  filter(habitat == "Degraded")
+RA_map_degraded$gopher_tortoise_activity = factor(RA_map_degraded$gopher_tortoise_activity, 
+                                 levels = c("Burrowing", "Foraging"))
+
+cohens_d(RA_rich ~ gopher_tortoise_activity, data = RA_map_degraded)
+cohens_d(RA_div ~ gopher_tortoise_activity, data = RA_map_degraded)
+```
+###Add mean plant diversity per site and microbial/nematode diversity to overall mapping file for downstream analyses
+```{r adding diversities to mapping files}
+# add new plant metrics to overall mapping file for 
+plant_rich_site = plant_mapping %>%
+  group_by(habitat, site) %>%
+  summarise(mean_plant_rich = mean(plant_rich)) 
+
+plant_div_site = plant_mapping %>%
+  group_by(habitat, site) %>%
+  summarise(mean_plant_div = mean(plant_div)) 
+
+plant_distinct_plot = merge(plant_div_site, plant_rich_site)
+shorten_eco <- c("Intact" = "S", "Degraded" = "F")
+plant_distinct_plot$sampleID <- paste0(shorten_eco[plant_distinct_plot$habitat], ".", plant_distinct_plot$site, ".O_F")
+plant_distinct_plot <- plant_distinct_plot[3:5]
+map_w_div <- merge(map, plant_distinct_plot, 
+                   by = "sampleID", all.x = TRUE)
+
+# replace NAs (for burrowing plots) with 0
+map_w_div$mean_plant_div[is.na(map_w_div$mean_plant_div)] <- 0
+map_w_div$mean_plant_rich[is.na(map_w_div$mean_plant_rich)] <- 0
+
+
+write.table(map_w_div, "metadata_gt_all_with_div.txt", sep = "\t", row.names = FALSE, quote = FALSE)
+```
+###Reload all data with diversity metrics included
+```{r reload all data with plant metrics}
+# remove existing files
+rm(list = ls())
+
+# call .txt files
+tax_table_nem = 'nem_asv_gt.txt'
+tax_table_bact= 'bact_asv_gt.txt'
+tax_table_fung= 'fung_asv_gt.txt'
+tax_table_prot = 'prot_asv_gt_n.txt'
+map_fp_plants = 'metadata_gt_all_with_div.txt'
+
+# load and filter for each broad group
+input_nem = load_taxa_table(tax_table_nem, map_fp_plants)
+input_nem$map_loaded$sampleID <- row.names(input_nem$map_loaded)
+input_nem_ra = convert_to_relative_abundances(input_nem)
+
+input_bact = load_taxa_table(tax_table_bact, map_fp_plants)
+input_bact$map_loaded$sampleID <- row.names(input_bact$map_loaded)
+input_bact_ra = convert_to_relative_abundances(input_bact)
+input_bact_ra = filter_taxa_from_input(input_bact_ra, taxa_to_remove = "mitochondria")
+input_bact_ra = filter_taxa_from_input(input_bact_ra, taxa_to_remove = "Chloroplast")
+
+input_fung = load_taxa_table(tax_table_fung, map_fp_plants)
+input_fung$map_loaded$sampleID <- row.names(input_fung$map_loaded)
+input_fung_ra = convert_to_relative_abundances(input_fung)
+
+
+input_prot = load_taxa_table(tax_table_prot, map_fp_plants)
+input_prot$map_loaded$sampleID <- row.names(input_prot$map_loaded)
+input_prot_ra = convert_to_relative_abundances(input_prot)
+```
+##Run analyses on lineages (at varying taxonomic resolution) for each group
+###Starting with bacteria
+```{r bacterial relative abundances analyses}
+# Summarize bacteria at the phylum level #
+sumtax_bact_phylum <- summarize_taxonomy(input_bact_ra, level = 2, report_higher_tax = F)
+
+# clean up names... create separate phylum level taxonomy
+bact_phylum_taxonomy <- as.data.frame(rownames(sumtax_bact_phylum))
+bact_phylum_taxonomy$label <- bact_phylum_taxonomy$`rownames(sumtax_bact_phylum)`
+
+bact_phylum_taxonomy$label = recode(bact_phylum_taxonomy$label,
+                               "Deinococcus-Thermus" = "Deinococcus_Thermus",
+                               "BHI80-139" = "BHI80_139",
+                               "NPL-UPA2" = "NPL_UPA2",
+                               "WCHB1-60" = "WCHB1_60")
+# go by labels, flip
+rownames(sumtax_bact_phylum) <- bact_phylum_taxonomy$label
+sumtax_bact_phylum.t <- as.data.frame(t(sumtax_bact_phylum))
+
+
+#map
+bact_map_model <- input_bact_ra$map_loaded
+
+# merge phylum table and map
+bact_phylum_wmap <- merge(sumtax_bact_phylum.t, bact_map_model, by = 0)
+
+Acidobacteria<-lmer(Acidobacteria~ habitat*gopher_tortoise_activity + (1|site), data = bact_phylum_wmap)
+Actinobacteria<-lmer(Actinobacteria~ habitat*gopher_tortoise_activity + (1|site), data = bact_phylum_wmap)
+Armatimonadetes<-lmer(Armatimonadetes~ habitat*gopher_tortoise_activity + (1|site), data = bact_phylum_wmap)
+Bacteroidetes<-lmer(Bacteroidetes~ habitat*gopher_tortoise_activity + (1|site), data = bact_phylum_wmap)
+BHI80_139<-lmer(BHI80_139~ habitat*gopher_tortoise_activity + (1|site), data = bact_phylum_wmap)
+Candidate_division_BRC1<-lmer(Candidate_division_BRC1~ habitat*gopher_tortoise_activity + (1|site), data = bact_phylum_wmap)
+Candidate_division_OD1<-lmer(Candidate_division_OD1~ habitat*gopher_tortoise_activity + (1|site), data = bact_phylum_wmap)
+Candidate_division_OP11<-lmer(Candidate_division_OP11~ habitat*gopher_tortoise_activity + (1|site), data = bact_phylum_wmap)
+Candidate_division_OP3<-lmer(Candidate_division_OP3~ habitat*gopher_tortoise_activity + (1|site), data = bact_phylum_wmap)
+Candidate_division_TM7<-lmer(Candidate_division_TM7~ habitat*gopher_tortoise_activity + (1|site), data = bact_phylum_wmap)
+Candidate_division_WS3<-lmer(Candidate_division_WS3~ habitat*gopher_tortoise_activity + (1|site), data = bact_phylum_wmap)
+Chlamydiae<-lmer(Chlamydiae~ habitat*gopher_tortoise_activity + (1|site), data = bact_phylum_wmap)
+Chlorobi<-lmer(Chlorobi~ habitat*gopher_tortoise_activity + (1|site), data = bact_phylum_wmap)
+Chloroflexi<-lmer(Chloroflexi~ habitat*gopher_tortoise_activity + (1|site), data = bact_phylum_wmap)
+Cyanobacteria<-lmer(Cyanobacteria~ habitat*gopher_tortoise_activity + (1|site), data = bact_phylum_wmap)
+Deinococcus_Thermus<-lmer(Deinococcus_Thermus~ habitat*gopher_tortoise_activity + (1|site), data = bact_phylum_wmap)
+Elusimicrobia<-lmer(Elusimicrobia~ habitat*gopher_tortoise_activity + (1|site), data = bact_phylum_wmap)
+Fibrobacteres<-lmer(Fibrobacteres~ habitat*gopher_tortoise_activity + (1|site), data = bact_phylum_wmap)
+Firmicutes<-lmer(Firmicutes~ habitat*gopher_tortoise_activity + (1|site), data = bact_phylum_wmap)
+GAL08<-lmer(GAL08~ habitat*gopher_tortoise_activity + (1|site), data = bact_phylum_wmap)
+Gemmatimonadetes<-lmer(Gemmatimonadetes~ habitat*gopher_tortoise_activity + (1|site), data = bact_phylum_wmap)
+Lentisphaerae<-lmer(Lentisphaerae~ habitat*gopher_tortoise_activity + (1|site), data = bact_phylum_wmap)
+Nitrospirae<-lmer(Nitrospirae~ habitat*gopher_tortoise_activity + (1|site), data = bact_phylum_wmap)
+NPL_UPA2<-lmer(NPL_UPA2~ habitat*gopher_tortoise_activity + (1|site), data = bact_phylum_wmap)
+Planctomycetes<-lmer(Planctomycetes~ habitat*gopher_tortoise_activity + (1|site), data = bact_phylum_wmap)
+Proteobacteria<-lmer(Proteobacteria~ habitat*gopher_tortoise_activity + (1|site), data = bact_phylum_wmap)
+SM2F11<-lmer(SM2F11~ habitat*gopher_tortoise_activity + (1|site), data = bact_phylum_wmap)
+Spirochaetes<-lmer(Spirochaetes~ habitat*gopher_tortoise_activity + (1|site), data = bact_phylum_wmap)
+TA06<-lmer(TA06~ habitat*gopher_tortoise_activity + (1|site), data = bact_phylum_wmap)
+Tenericutes<-lmer(Tenericutes~ habitat*gopher_tortoise_activity + (1|site), data = bact_phylum_wmap)
+Thermotogae<-lmer(Thermotogae~ habitat*gopher_tortoise_activity + (1|site), data = bact_phylum_wmap)
+TM6<-lmer(TM6~ habitat*gopher_tortoise_activity + (1|site), data = bact_phylum_wmap)
+Verrucomicrobia<-lmer(Verrucomicrobia~ habitat*gopher_tortoise_activity + (1|site), data = bact_phylum_wmap)
+WCHB1_60<-lmer(WCHB1_60~ habitat*gopher_tortoise_activity + (1|site), data = bact_phylum_wmap)
+
+anova(Acidobacteria)
+anova(Actinobacteria)
+anova(Armatimonadetes)
+anova(Bacteroidetes)
+anova(BHI80_139)
+anova(Candidate_division_BRC1)
+anova(Candidate_division_OD1)
+anova(Candidate_division_OP11)
+anova(Candidate_division_OP3)
+anova(Candidate_division_TM7)
+anova(Candidate_division_WS3)
+anova(Chlamydiae)
+anova(Chlorobi)
+anova(Chloroflexi)
+anova(Cyanobacteria)
+anova(Deinococcus_Thermus)
+anova(Elusimicrobia)
+anova(Fibrobacteres)
+anova(Firmicutes)
+anova(GAL08)
+anova(Gemmatimonadetes)
+anova(Lentisphaerae)
+anova(Nitrospirae)
+anova(NPL_UPA2)
+anova(Planctomycetes)
+anova(Proteobacteria)
+anova(SM2F11)
+anova(Spirochaetes)
+anova(TA06)
+anova(Tenericutes)
+anova(Thermotogae)
+anova(TM6)
+anova(Verrucomicrobia)
+anova(WCHB1_60)
+```
+
+```{r bacteria relative abundance figure}
+bact_map = input_bact_ra$map_loaded
+
+
+## BY Treatment
+table_bact_level2_fp_sort = summarize_taxonomy(input_bact_ra, level = 2,
+                                              report_higher_tax = F)
+
+
+
+total_bact_sort = table_bact_level2_fp_sort %>%
+  t() %>%
+  as.data.frame() %>%
+  rownames_to_column("sampleID") %>%
+  left_join(bact_map) %>%
+  pivot_longer(cols=c(2:35), names_to = "Phylum", values_to = 'abund') %>%
+  as.data.frame() 
+
+# make mean relative abundacne by treatment
+trt_bact = total_bact_sort %>%
+  group_by(treatment, Phylum) %>% 
+  summarise(mean_RA = mean(abund))
+
+trt_bact$Phylum = factor(trt_bact$Phylum, 
+                        levels = c("Tenericutes",
+                                   "Candidate_division_OP11",
+                                   "Candidate_division_OD1",
+                                   "Candidate_division_TM7",
+                                   "Lentisphaerae",
+                                   "Candidate_division_BRC1",
+                                   "BHI80-139",
+                                   "TA06",
+                                   "Spirochaetes",
+                                   "NPL-UPA2",
+                                   "WCHB1-60",
+                                   "SM2F11",
+                                   "GAL08",
+                                   "Fibrobacteres",
+                                   "Deinococcus-Thermus",
+                                   "TM6",
+                                   "Chlamydiae",
+                                   "Candidate_division_OP3",
+                                   "Candidate_division_WS3",
+                                   "Chlorobi",
+                                   "Thermotogae",
+                                   "Elusimicrobia",
+                                   "Armatimonadetes",
+                                   "Nitrospirae",
+                                   "Gemmatimonadetes",
+                                   "Bacteroidetes",
+                                   "Cyanobacteria",
+                                   "Chloroflexi",
+                                   "Verrucomicrobia",
+                                   "Planctomycetes",
+                                   "Actinobacteria",
+                                   "Firmicutes",
+                                   "Acidobacteria",
+                                   "Proteobacteria" ))
+
+trt_bact$treatment = factor(trt_bact$treatment, 
+                     levels = c("IntactBurrowing", "IntactForaging", "DegradedBurrowing", "DegradedForaging"))
+
+ggplot(trt_bact, aes(x=treatment, y=mean_RA)) + 
+  geom_bar(aes(fill = Phylum), position = "stack", stat="identity") +
+  scale_fill_manual(values = c("#E0B0FF",	"#7F00FF",		
+                               "#40E0D0",
+                               "#00004d",	"#00FFFF",	"#000066",	"#0000FF",	"#0096FF",	"#6699ff",  "#0033ff",  "#3366ff",  "#1434A4",	
+                               "#4d0000", "#b30000",  "#660000",  "#ff3333",  "#cc0000",  "#ff8080",  "#990000", 
+                               "#BF40BF",	"#AA336A",  "#FF00FF",	"#FF69B4",	"#FFB6C1",  "#E30B5C",
+                               "#FFBF00",	"#FBCEB1",	"#CD7F32",	"#FFC000",	"#FFEA00",	"#F28C28",	"#E97451",	"#FAD5A5",	"#DAA06D",	"#F4BB44",	"#FFAA33",	"#B87333",	"#FF7518",	"#CC5500",	"#FFFF8F",	"#F0E68C",	"#FADA5E",	"#FFFAA0",	"#F8DE7E",	"#FDDA0D",	"#E1C16E"))+
+  labs(
+    x = NULL,
+    y = "Relative Abundance of Bacterial Phyla",
+    fill = NULL
+  ) + 
+  theme_classic() +
+  theme(axis.text.x = element_text(angle = 45, hjust=1)) 
+```
+###Fungi
+```{r fungal relative abundances}
+# Summarize fungi at the phylum level #
+sumtax_fungi_phylum <- summarize_taxonomy(input_fung_ra, level = 7, report_higher_tax = F)
+
+# clean up names... create separate phylum level taxonomy
+fung_phylum_taxonomy <- as.data.frame(rownames(sumtax_fungi_phylum))
+fung_phylum_taxonomy$label <- fung_phylum_taxonomy$`rownames(sumtax_fungi_phylum)`
+
+# go by labels, flip
+rownames(sumtax_fungi_phylum) <- fung_phylum_taxonomy$label
+sumtax_fungi_phylum.t <- as.data.frame(t(sumtax_fungi_phylum))
+
+#map
+fung_map_model <- input_fung_ra$map_loaded
+
+# merge phylum table and map
+fung_phylum_wmap <- merge(sumtax_fungi_phylum.t, fung_map_model, by = 0)
+
+Ascomycota<-lmer(Ascomycota~ habitat*gopher_tortoise_activity + (1|site), data = fung_phylum_wmap)
+Basidiomycota<-lmer(Basidiomycota~ habitat*gopher_tortoise_activity + (1|site), data = fung_phylum_wmap)
+Blastocladiomycota<-lmer(Blastocladiomycota~ habitat*gopher_tortoise_activity + (1|site), data = fung_phylum_wmap)
+Chytridiomycota<-lmer(Chytridiomycota~ habitat*gopher_tortoise_activity + (1|site), data = fung_phylum_wmap)
+Cryptomycota<-lmer(Cryptomycota~ habitat*gopher_tortoise_activity + (1|site), data = fung_phylum_wmap)
+Mucoromycota<-lmer(Mucoromycota~ habitat*gopher_tortoise_activity + (1|site), data = fung_phylum_wmap)
+Olpidiomycota<-lmer(Olpidiomycota~ habitat*gopher_tortoise_activity + (1|site), data = fung_phylum_wmap)
+Zoopagomycota<-lmer(Zoopagomycota~ habitat*gopher_tortoise_activity + (1|site), data = fung_phylum_wmap)
+
+anova(Ascomycota)
+anova(Basidiomycota)
+anova(Blastocladiomycota)
+anova(Chytridiomycota)
+anova(Cryptomycota)
+anova(Mucoromycota)
+anova(Olpidiomycota)
+anova(Zoopagomycota)
+```
+
+```{r fungal relative abundance figure}
+fung_map = input_fung_ra$map_loaded
+
+## BY Treatment
+table_fung_level7_fp_sort = summarize_taxonomy(input_fung_ra, level = 7,
+                                               report_higher_tax = F)
+
+
+
+total_fung_sort = table_fung_level7_fp_sort %>%
+  t() %>%
+  as.data.frame() %>%
+  rownames_to_column("sampleID") %>%
+  left_join(fung_map) %>%
+  pivot_longer(cols=c(2:9), names_to = "Phylum", values_to = 'abund') %>%
+  as.data.frame() 
+
+# make mean RA by trt
+trt_fung = total_fung_sort %>%
+  group_by(treatment, Phylum) %>% 
+  summarise(mean_RA = mean(abund))
+
+trt_fung$Phylum = factor(trt_fung$Phylum, 
+                         levels = c("Cryptomycota",
+                                    "Blastocladiomycota",
+                                    "Zoopagomycota",
+                                    "Olpidiomycota",
+                                    "Chytridiomycota",
+                                    "Mucoromycota",
+                                    "Ascomycota",
+                                    "Basidiomycota"))
+
+trt_fung$treatment = factor(trt_fung$treatment, 
+                      levels = c("IntactBurrowing", "IntactForaging", "DegradedBurrowing", "DegradedForaging"))
+
+ggplot(trt_fung, aes(x=treatment, y=mean_RA)) + 
+  geom_bar(aes(fill = Phylum), position = "stack", stat="identity") +
+  scale_fill_manual(values = c("#E0B0FF",	"#7F00FF",		
+                               "#40E0D0",
+                               "#00004d",	"#00FFFF",	"#000066",	"#0000FF",	"#0096FF",	"#6699ff",  "#0033ff",  "#3366ff",  "#1434A4",	
+                               "#4d0000", "#b30000",  "#660000",  "#ff3333",  "#cc0000",  "#ff8080",  "#990000", 
+                               "#BF40BF",	"#AA336A",  "#FF00FF",	"#FF69B4",	"#FFB6C1",  "#E30B5C",
+                               "#FFBF00",	"#FBCEB1",	"#CD7F32",	"#FFC000",	"#FFEA00",	"#F28C28",	"#E97451",	"#FAD5A5",	"#DAA06D",	"#F4BB44",	"#FFAA33",	"#B87333",	"#FF7518",	"#CC5500",	"#FFFF8F",	"#F0E68C",	"#FADA5E",	"#FFFAA0",	"#F8DE7E",	"#FDDA0D",	"#E1C16E"))+
+  labs(
+    x = NULL,
+    y = "Relative Abundance of Fungal Phyla",
+    fill = NULL
+  ) + 
+  theme_classic() +
+  theme(axis.text.x = element_text(angle = 45, hjust=1)) 
+```
+###Protists
+```{r protist relative abundances}
+# Summarize protists at level 3 (various levels for inconsistent taxonomy) #
+sumtax_prot <- summarize_taxonomy(input_prot_ra, level = 3, report_higher_tax = F)
+
+# clean up names... 
+prot_taxonomy <- as.data.frame(rownames(sumtax_prot))
+prot_taxonomy$label <- prot_taxonomy$`rownames(sumtax_prot)`
+
+prot_taxonomy$label = recode(prot_taxonomy$label,
+                               "Nucleariidae and Fonticula group" = "Rotosphaerida",
+                               "Opisthokonta incertae sedis" = "Opisthokonta_incertae_sedis",
+                               "Oxnerella <Centroheliozoa>" = "Centroplasthelida",
+                               "PX clade" = "PX_clade",
+                               "unclassified Heterolobosea" = "unclassified_Heterolobosea",
+                               "unclassified Rhizaria" = "unclassified_Rhizaria",
+                               "unclassified stramenopiles" = "unclassified_stramenopiles")
+# go by labels, flip
+rownames(sumtax_prot) <- prot_taxonomy$label
+sumtax_prot.t <- as.data.frame(t(sumtax_prot))
+
+#map
+prot_map_model <- input_prot_ra$map_loaded
+
+# merge family table and map
+prot_wmap <- merge(sumtax_prot.t, prot_map_model, by = 0)
+
+Apicomplexa<-lmer(Apicomplexa~ habitat*gopher_tortoise_activity + (1|site), data =  prot_wmap)
+Apusomonadidae<-lmer(Apusomonadidae~ habitat*gopher_tortoise_activity + (1|site), data =  prot_wmap)
+Bacillariophyta<-lmer(Bacillariophyta~ habitat*gopher_tortoise_activity + (1|site), data =  prot_wmap)
+Bangiophyceae<-lmer(Bangiophyceae~ habitat*gopher_tortoise_activity + (1|site), data =  prot_wmap)
+Bicosoecida<-lmer(Bicosoecida~ habitat*gopher_tortoise_activity + (1|site), data =  prot_wmap)
+Cercozoa<-lmer(Cercozoa~ habitat*gopher_tortoise_activity + (1|site), data =  prot_wmap)
+Choanoflagellida<-lmer(Choanoflagellida~ habitat*gopher_tortoise_activity + (1|site), data =  prot_wmap)
+Chrysophyceae<-lmer(Chrysophyceae~ habitat*gopher_tortoise_activity + (1|site), data =  prot_wmap)
+Ciliophora<-lmer(Ciliophora~ habitat*gopher_tortoise_activity + (1|site), data =  prot_wmap)
+Colpodellidae<-lmer(Colpodellidae~ habitat*gopher_tortoise_activity + (1|site), data =  prot_wmap)
+Cryptomonadales<-lmer(Cryptomonadales~ habitat*gopher_tortoise_activity + (1|site), data =  prot_wmap)
+Dinophyceae<-lmer(Dinophyceae~ habitat*gopher_tortoise_activity + (1|site), data =  prot_wmap)
+Discosea<-lmer(Discosea~ habitat*gopher_tortoise_activity + (1|site), data =  prot_wmap)
+Euglenoida<-lmer(Euglenoida~ habitat*gopher_tortoise_activity + (1|site), data =  prot_wmap)
+Eustigmatophyceae<-lmer(Eustigmatophyceae~ habitat*gopher_tortoise_activity + (1|site), data =  prot_wmap)
+Foraminifera<-lmer(Foraminifera~ habitat*gopher_tortoise_activity + (1|site), data =  prot_wmap)
+Heterophryidae<-lmer(Heterophryidae~ habitat*gopher_tortoise_activity + (1|site), data =  prot_wmap)
+Histionidae<-lmer(Histionidae~ habitat*gopher_tortoise_activity + (1|site), data =  prot_wmap)
+Hyphochytriomycetes<-lmer(Hyphochytriomycetes~ habitat*gopher_tortoise_activity + (1|site), data =  prot_wmap)
+Kinetoplastida<-lmer(Kinetoplastida~ habitat*gopher_tortoise_activity + (1|site), data =  prot_wmap)
+Mycetozoa<-lmer(Mycetozoa~ habitat*gopher_tortoise_activity + (1|site), data =  prot_wmap)
+Rotosphaerida<-lmer(Rotosphaerida~ habitat*gopher_tortoise_activity + (1|site), data =  prot_wmap)
+Oikomonadaceae<-lmer(Oikomonadaceae~ habitat*gopher_tortoise_activity + (1|site), data =  prot_wmap)
+Oomycetes<-lmer(Oomycetes~ habitat*gopher_tortoise_activity + (1|site), data =  prot_wmap)
+Opisthokonta_incertae_sedis<-lmer(Opisthokonta_incertae_sedis~ habitat*gopher_tortoise_activity + (1|site), data =  prot_wmap)
+Centroplasthelida<-lmer(Centroplasthelida~ habitat*gopher_tortoise_activity + (1|site), data =  prot_wmap)
+Phalansterium<-lmer(Phalansterium~ habitat*gopher_tortoise_activity + (1|site), data =  prot_wmap)
+PX_clade<-lmer(PX_clade~ habitat*gopher_tortoise_activity + (1|site), data =  prot_wmap)
+Pyrenomonadales<-lmer(Pyrenomonadales~ habitat*gopher_tortoise_activity + (1|site), data =  prot_wmap)
+Raphidophyceae<-lmer(Raphidophyceae~ habitat*gopher_tortoise_activity + (1|site), data =  prot_wmap)
+Schizopyrenida<-lmer(Schizopyrenida~ habitat*gopher_tortoise_activity + (1|site), data =  prot_wmap)
+Synurophyceae<-lmer(Synurophyceae~ habitat*gopher_tortoise_activity + (1|site), data =  prot_wmap)
+Tubulinea<-lmer(Tubulinea~ habitat*gopher_tortoise_activity + (1|site), data =  prot_wmap)
+unclassified_Heterolobosea<-lmer(unclassified_Heterolobosea~ habitat*gopher_tortoise_activity + (1|site), data =  prot_wmap)
+unclassified_Rhizaria<-lmer(unclassified_Rhizaria~ habitat*gopher_tortoise_activity + (1|site), data =  prot_wmap)
+unclassified_stramenopiles<-lmer(unclassified_stramenopiles~ habitat*gopher_tortoise_activity + (1|site), data =  prot_wmap)
+
+anova(Apicomplexa)
+anova(Apusomonadidae)
+anova(Bacillariophyta)
+anova(Bangiophyceae)
+anova(Bicosoecida)
+anova(Cercozoa)
+anova(Choanoflagellida)
+anova(Chrysophyceae)
+anova(Ciliophora)
+anova(Colpodellidae)
+anova(Cryptomonadales)
+anova(Dinophyceae)
+anova(Discosea)
+anova(Euglenoida)
+anova(Eustigmatophyceae)
+anova(Foraminifera)
+anova(Heterophryidae)
+anova(Histionidae)
+anova(Hyphochytriomycetes)
+anova(Kinetoplastida)
+anova(Mycetozoa)
+anova(Rotosphaerida)
+anova(Oikomonadaceae)
+anova(Oomycetes)
+anova(Opisthokonta_incertae_sedis)
+anova(Centroplasthelida)
+anova(Phalansterium)
+anova(PX_clade)
+anova(Pyrenomonadales)
+anova(Raphidophyceae)
+anova(Schizopyrenida)
+anova(Synurophyceae)
+anova(Tubulinea)
+anova(unclassified_Heterolobosea)
+anova(unclassified_Rhizaria)
+anova(unclassified_stramenopiles)
+```
+
+```{r protist relative abundance figure}
+# filter out F.10.A_F - it causes issues of NAs
+input_prot_ra_fp = filter_data(input_prot_ra, filter_cat = "sampleID", filter_vals = "F.10.A_F")
+
+prot_map = input_prot_ra_fp$map_loaded
+
+## BY Treatment
+table_prot_level3_fp_sort = summarize_taxonomy(input_prot_ra_fp, level = 3,
+                                               report_higher_tax = F)
+
+
+
+total_prot_sort = table_prot_level3_fp_sort %>%
+  t() %>%
+  as.data.frame() %>%
+  rownames_to_column("sampleID") %>%
+  left_join(prot_map) %>%
+  pivot_longer(cols=c(2:38), names_to = "Phylum", values_to = 'abund') %>%
+  as.data.frame() 
+
+# make mean RA by trt
+trt_prot = total_prot_sort %>%
+  group_by(treatment, Phylum) %>% 
+  summarise(mean_RA = mean(abund))
+
+trt_prot$Phylum = factor(trt_prot$Phylum, 
+                         levels = c("Colpodellidae",
+                                    "Oikomonadaceae",
+                                    "Euglenoida",
+                                    "Apusomonadidae",
+                                    "named eukaryotic clones",
+                                    "Nucleariidae and Fonticula group",
+                                    "Heterophryidae",
+                                    "Histionidae",
+                                    "Oxnerella <Centroheliozoa>",
+                                    "Discosea",
+                                    "Pyrenomonadales",
+                                    "Phalansterium",
+                                    "PX clade",
+                                    "unclassified Rhizaria",
+                                    "unclassified Heterolobosea",
+                                    "Mycetozoa",
+                                    "Kinetoplastida",
+                                    "Choanoflagellida",
+                                    "Tubulinea",
+                                    "Oomycetes",
+                                    "Schizopyrenida",
+                                    "Opisthokonta incertae sedis",
+                                    "Dinophyceae",
+                                    "Foraminifera",
+                                    "Bacillariophyta",
+                                    "Raphidophyceae",
+                                    "Bangiophyceae",
+                                    "Eustigmatophyceae",
+                                    "Cryptomonadales",
+                                    "Bicosoecida",
+                                    "Apicomplexa",
+                                    "Synurophyceae",
+                                    "Hyphochytriomycetes",
+                                    "Ciliophora",
+                                    "unclassified stramenopiles",
+                                    "Chrysophyceae",
+                                    "Cercozoa"))
+
+trt_prot$treatment = factor(trt_prot$treatment, 
+                      levels = c("IntactBurrowing", "IntactForaging", "DegradedBurrowing", "DegradedForaging"))
+
+ggplot(trt_prot, aes(x=treatment, y=mean_RA)) + 
+  geom_bar(aes(fill = Phylum), position = "stack", stat="identity") +
+  scale_fill_manual(values = c( "#004d00", "#80e680",  "#006400",  "#008f11",  "#b3ffb3",  "#00a000",  "#007a33",  "#00b300",  "#33cc33",  "#99f099",  "#ccffcc",  "#454B1B",  "#99e699",
+                                "#E0B0FF",	"#7F00FF",
+                               "#00004d",	"#00FFFF",	"#000066",	"#0000FF",	"#0096FF",	"#6699ff",  "#0033ff",  "#3366ff",  "#1434A4",	
+                               "#4d0000", "#b30000",  "#660000",  "#ff3333",  "#cc0000",  "#ff8080",  "#990000", 
+                               "#BF40BF",	"#AA336A",  "#FF00FF",	"#FF69B4",	"#FFB6C1",  "#E30B5C"
+                               ))+
+  labs(
+    x = NULL,
+    y = "Relative Abundance of Protist Taxa",
+    fill = NULL
+  ) + 
+  theme_classic() +
+  theme(axis.text.x = element_text(angle = 45, hjust=1)) 
+```
+###Nematodes
+```{r nematode relative abundances}
+# Summarize at the family level #
+sumtax_nem_family <- summarize_taxonomy(input_nem_ra, level = 4, report_higher_tax = F)
+
+# clean up names... create separate family level taxonomy
+nem_family_taxonomy <- as.data.frame(rownames(sumtax_nem_family))
+nem_family_taxonomy$label <- nem_family_taxonomy$`rownames(sumtax_nem_family)`
+
+# go by labels, flip
+rownames(sumtax_nem_family) <- nem_family_taxonomy$label
+sumtax_nem_family.t <- as.data.frame(t(sumtax_nem_family))
+
+#map
+nem_map_model <- input_nem_ra$map_loaded
+
+# merge family table and map
+nem_family_wmap <- merge(sumtax_nem_family.t, nem_map_model, by = 0)
+
+Cyatholaimidae<-lmer(Cyatholaimidae~ habitat*gopher_tortoise_activity + (1|site), data = nem_family_wmap)
+Mermithidae<-lmer(Mermithidae~ habitat*gopher_tortoise_activity + (1|site), data = nem_family_wmap)
+Trichostrongylidae<-lmer(Trichostrongylidae~ habitat*gopher_tortoise_activity + (1|site), data = nem_family_wmap)
+Alaimidae<-lmer(Alaimidae~ habitat*gopher_tortoise_activity + (1|site), data = nem_family_wmap)
+Bastianiidae<-lmer(Bastianiidae~ habitat*gopher_tortoise_activity + (1|site), data = nem_family_wmap)
+Bunonematidae<-lmer(Bunonematidae~ habitat*gopher_tortoise_activity + (1|site), data = nem_family_wmap)
+Cephalobidae<-lmer(Cephalobidae~ habitat*gopher_tortoise_activity + (1|site), data = nem_family_wmap)
+Chronogastridae<-lmer(Chronogastridae~ habitat*gopher_tortoise_activity + (1|site), data = nem_family_wmap)
+Comesomatidae<-lmer(Comesomatidae~ habitat*gopher_tortoise_activity + (1|site), data = nem_family_wmap)
+Cryptonchidae<-lmer(Cryptonchidae~ habitat*gopher_tortoise_activity + (1|site), data = nem_family_wmap)
+Diplogasteridae<-lmer(Diplogasteridae~ habitat*gopher_tortoise_activity + (1|site), data = nem_family_wmap)
+Diplopeltidae<-lmer(Diplopeltidae~ habitat*gopher_tortoise_activity + (1|site), data = nem_family_wmap)
+Drilonematidae<-lmer(Drilonematidae~ habitat*gopher_tortoise_activity + (1|site), data = nem_family_wmap)
+Haliplectidae<-lmer(Haliplectidae~ habitat*gopher_tortoise_activity + (1|site), data = nem_family_wmap)
+Isolaimiidae<-lmer(Isolaimiidae~ habitat*gopher_tortoise_activity + (1|site), data = nem_family_wmap)
+Microlaimidae<-lmer(Microlaimidae~ habitat*gopher_tortoise_activity + (1|site), data = nem_family_wmap)
+Monhysteridae<-lmer(Monhysteridae~ habitat*gopher_tortoise_activity + (1|site), data = nem_family_wmap)
+Neodiplogasteridae<-lmer(Neodiplogasteridae~ habitat*gopher_tortoise_activity + (1|site), data = nem_family_wmap)
+Odontolaimidae<-lmer(Odontolaimidae~ habitat*gopher_tortoise_activity + (1|site), data = nem_family_wmap)
+Plectidae<-lmer(Plectidae~ habitat*gopher_tortoise_activity + (1|site), data = nem_family_wmap)
+Prismatolaimidae<-lmer(Prismatolaimidae~ habitat*gopher_tortoise_activity + (1|site), data = nem_family_wmap)
+Rhabditidae<-lmer(Rhabditidae~ habitat*gopher_tortoise_activity + (1|site), data = nem_family_wmap)
+Rhabdolaimidae<-lmer(Rhabdolaimidae~ habitat*gopher_tortoise_activity + (1|site), data = nem_family_wmap)
+Allantonematidae<-lmer(Allantonematidae~ habitat*gopher_tortoise_activity + (1|site), data = nem_family_wmap)
+Steinernematidae<-lmer(Steinernematidae~ habitat*gopher_tortoise_activity + (1|site), data = nem_family_wmap)
+Aphelenchidae<-lmer(Aphelenchidae~ habitat*gopher_tortoise_activity + (1|site), data = nem_family_wmap)
+Aphelenchoididae<-lmer(Aphelenchoididae~ habitat*gopher_tortoise_activity + (1|site), data = nem_family_wmap)
+Diphtherophoridae<-lmer(Diphtherophoridae~ habitat*gopher_tortoise_activity + (1|site), data = nem_family_wmap)
+Leptonchidae<-lmer(Leptonchidae~ habitat*gopher_tortoise_activity + (1|site), data = nem_family_wmap)
+Tylencholaimellidae<-lmer(Tylencholaimellidae~ habitat*gopher_tortoise_activity + (1|site), data = nem_family_wmap)
+Tylencholaimidae<-lmer(Tylencholaimidae~ habitat*gopher_tortoise_activity + (1|site), data = nem_family_wmap)
+Aporcelaimidae<-lmer(Aporcelaimidae~ habitat*gopher_tortoise_activity + (1|site), data = nem_family_wmap)
+Chrysonematidae<-lmer(Chrysonematidae~ habitat*gopher_tortoise_activity + (1|site), data = nem_family_wmap)
+Dorylaimidae<-lmer(Dorylaimidae~ habitat*gopher_tortoise_activity + (1|site), data = nem_family_wmap)
+Mydonomidae<-lmer(Mydonomidae~ habitat*gopher_tortoise_activity + (1|site), data = nem_family_wmap)
+Nordiidae<-lmer(Nordiidae~ habitat*gopher_tortoise_activity + (1|site), data = nem_family_wmap)
+Qudsianematidae<-lmer(Qudsianematidae~ habitat*gopher_tortoise_activity + (1|site), data = nem_family_wmap)
+Thornenematidae<-lmer(Thornenematidae~ habitat*gopher_tortoise_activity + (1|site), data = nem_family_wmap)
+Anguinidae<-lmer(Anguinidae~ habitat*gopher_tortoise_activity + (1|site), data = nem_family_wmap)
+Belondiridae<-lmer(Belondiridae~ habitat*gopher_tortoise_activity + (1|site), data = nem_family_wmap)
+Belonolaimidae<-lmer(Belonolaimidae~ habitat*gopher_tortoise_activity + (1|site), data = nem_family_wmap)
+Criconematidae<-lmer(Criconematidae~ habitat*gopher_tortoise_activity + (1|site), data = nem_family_wmap)
+Hemicycliophoridae<-lmer(Hemicycliophoridae~ habitat*gopher_tortoise_activity + (1|site), data = nem_family_wmap)
+Hoplolaimidae<-lmer(Hoplolaimidae~ habitat*gopher_tortoise_activity + (1|site), data = nem_family_wmap)
+Longidoridae<-lmer(Longidoridae~ habitat*gopher_tortoise_activity + (1|site), data = nem_family_wmap)
+Meloidogynidae<-lmer(Meloidogynidae~ habitat*gopher_tortoise_activity + (1|site), data = nem_family_wmap)
+Merliniidae<-lmer(Merliniidae~ habitat*gopher_tortoise_activity + (1|site), data = nem_family_wmap)
+Pratylenchidae<-lmer(Pratylenchidae~ habitat*gopher_tortoise_activity + (1|site), data = nem_family_wmap)
+Telotylenchidae<-lmer(Telotylenchidae~ habitat*gopher_tortoise_activity + (1|site), data = nem_family_wmap)
+Trichodoridae<-lmer(Trichodoridae~ habitat*gopher_tortoise_activity + (1|site), data = nem_family_wmap)
+Tylenchulidae<-lmer(Tylenchulidae~ habitat*gopher_tortoise_activity + (1|site), data = nem_family_wmap)
+Actinolaimidae<-lmer(Actinolaimidae~ habitat*gopher_tortoise_activity + (1|site), data = nem_family_wmap)
+Anatonchidae<-lmer(Anatonchidae~ habitat*gopher_tortoise_activity + (1|site), data = nem_family_wmap)
+Ironidae<-lmer(Ironidae~ habitat*gopher_tortoise_activity + (1|site), data = nem_family_wmap)
+Mononchidae<-lmer(Mononchidae~ habitat*gopher_tortoise_activity + (1|site), data = nem_family_wmap)
+Mylonchulidae<-lmer(Mylonchulidae~ habitat*gopher_tortoise_activity + (1|site), data = nem_family_wmap)
+Nygolaimidae<-lmer(Nygolaimidae~ habitat*gopher_tortoise_activity + (1|site), data = nem_family_wmap)
+Tobrilidae<-lmer(Tobrilidae~ habitat*gopher_tortoise_activity + (1|site), data = nem_family_wmap)
+Trischistomatidae<-lmer(Trischistomatidae~ habitat*gopher_tortoise_activity + (1|site), data = nem_family_wmap)
+Tylenchidae<-lmer(Tylenchidae~ habitat*gopher_tortoise_activity + (1|site), data = nem_family_wmap)
+
+anova(Cyatholaimidae)
+anova(Mermithidae)
+anova(Trichostrongylidae)
+anova(Alaimidae)
+anova(Bastianiidae)
+anova(Bunonematidae)
+anova(Cephalobidae)
+anova(Chronogastridae)
+anova(Comesomatidae)
+anova(Cryptonchidae)
+anova(Diplogasteridae)
+anova(Diplopeltidae)
+anova(Drilonematidae)
+anova(Haliplectidae)
+anova(Isolaimiidae)
+anova(Microlaimidae)
+anova(Monhysteridae)
+anova(Neodiplogasteridae)
+anova(Odontolaimidae)
+anova(Plectidae)
+anova(Prismatolaimidae)
+anova(Rhabditidae)
+anova(Rhabdolaimidae)
+anova(Allantonematidae)
+anova(Steinernematidae)
+anova(Aphelenchidae)
+anova(Aphelenchoididae)
+anova(Diphtherophoridae)
+anova(Leptonchidae)
+anova(Tylencholaimellidae)
+anova(Tylencholaimidae)
+anova(Aporcelaimidae)
+anova(Chrysonematidae)
+anova(Dorylaimidae)
+anova(Mydonomidae)
+anova(Nordiidae)
+anova(Qudsianematidae)
+anova(Thornenematidae)
+anova(Anguinidae)
+anova(Belondiridae)
+anova(Belonolaimidae)
+anova(Criconematidae)
+anova(Hemicycliophoridae)
+anova(Hoplolaimidae)
+anova(Longidoridae)
+anova(Meloidogynidae)
+anova(Merliniidae)
+anova(Pratylenchidae)
+anova(Telotylenchidae)
+anova(Trichodoridae)
+anova(Tylenchulidae)
+anova(Actinolaimidae)
+anova(Anatonchidae)
+anova(Ironidae)
+anova(Mononchidae)
+anova(Mylonchulidae)
+anova(Nygolaimidae)
+anova(Tobrilidae)
+anova(Trischistomatidae)
+anova(Tylenchidae)
+```
+
+```{r nematode relative abundance figure}
+nem_map = input_nem_ra$map_loaded
+
+
+## BY Treatment
+table_nem_level4_fp_sort = summarize_taxonomy(input_nem_ra, level = 4,
+                                         report_higher_tax = T)
+
+
+
+total_nem_sort = table_nem_level4_fp_sort %>%
+  t() %>%
+  as.data.frame() %>%
+  rownames_to_column("sampleID") %>%
+  left_join(nem_map) %>%
+  pivot_longer(cols=c(2:62), names_to = "Family", values_to = 'abund') %>%
+  separate(Family, into = c("blank", "xx", "trophic", "family"), sep = "; ") %>%
+  as.data.frame() 
+
+# make mean RA by treatment
+trt_nem = total_nem_sort %>%
+  group_by(treatment, family) %>% 
+  summarise(mean_RA = mean(abund))
+
+trt_nem$family = factor(trt_nem$family, 
+                          levels = c("Mermithidae", # AP
+                                     "Trichostrongylidae", # AP 
+                                     "Cyatholaimidae", # AF 
+                                     "Allantonematidae", # EMP
+                                     "Tylenchidae", # RA
+                                     "Tobrilidae", ## end of PR
+                                     "Ironidae",
+                                     "Discolaimidae",
+                                     "Actinolaimidae",
+                                     "Nygolaimidae",
+                                     "Mylonchulidae",
+                                     "Trischistomatidae",
+                                     "Anatonchidae",
+                                     "Mononchidae",
+                                     "Chrysonematidae", ## end of OM
+                                     "Nordiidae",
+                                     "Mydonomidae",
+                                     "Thornenematidae",
+                                     "Aporcelaimidae",
+                                     "Qudsianematidae",
+                                     "Dorylaimidae",
+                                     "Trichodoridae", ## end of PP
+                                     "Hoplolaimidae",
+                                     "Hemicycliophoridae",
+                                     "Meloidogynidae",
+                                     "Belondiridae",
+                                     "Pratylenchidae",
+                                     "Tylenchulidae",
+                                     "Merliniidae",
+                                     "Belonolaimidae",
+                                     "Longidoridae",
+                                     "Criconematidae",
+                                     "Telotylenchidae",
+                                     "Anguinidae",
+                                     "Tylencholaimellidae", ## end of FF
+                                     "Aphelenchidae",
+                                     "Tylencholaimidae",
+                                     "Leptonchidae",
+                                     "Aphelenchoididae",
+                                     "Diphtherophoridae",
+                                     "Isolaimiidae", ## end of BF
+                                     "Diplogasteridae", 
+                                     "Bunonematidae",
+                                     "Diplopeltidae",
+                                     "Haliplectidae",
+                                     "Comesomatidae",
+                                     "Chronogastridae",
+                                     "Drilonematidae",
+                                     "Steinernematidae",
+                                     "Rhabditidae",
+                                     "Alaimidae",
+                                     "Microlaimidae",
+                                     "Odontolaimidae",
+                                     "Bastianiidae",
+                                     "Rhabdolaimidae",
+                                     "Neodiplogasteridae",
+                                     "Cryptonchidae",
+                                     "Monhysteridae",
+                                     "Prismatolaimidae",
+                                     "Plectidae",
+                                     "Cephalobidae"))
+
+
+trt_nem$treatment = factor(trt_nem$treatment, 
+                            levels = c("IntactBurrowing", "IntactForaging", "DegradedBurrowing", "DegradedForaging"))
+
+ggplot(trt_nem, aes(x=treatment, y=mean_RA)) + 
+  geom_bar(aes(fill = family), position = "stack", stat="identity") +
+  scale_fill_manual(values = c("#E0B0FF",	"#7F00FF",		
+                               "#40E0D0",
+                               "grey", 
+                               "black",
+                               "#00004d",	"#00FFFF",	"#000066",	"#0000FF",	"#0096FF",	"#6699ff",  "#0033ff",  "#3366ff",  "#1434A4",	
+                               "#4d0000", "#b30000",  "#660000",  "#ff3333",  "#cc0000",  "#ff8080",  "#990000", 
+                               "#004d00", "#80e680",  "#006400",  "#008f11",  "#b3ffb3",  "#00a000",  "#007a33",  "#00b300",  "#33cc33",  "#99f099",  "#ccffcc",  "#454B1B",  "#99e699", 
+                               "#BF40BF",	"#AA336A",  "#FF00FF",	"#FF69B4",	"#FFB6C1",  "#E30B5C",
+                               "#FFBF00",	"#FBCEB1",	"#CD7F32",	"#FFC000",	"#FFEA00",	"#F28C28",	"#E97451",	"#FAD5A5",	"#DAA06D",	"#F4BB44",	"#FFAA33",	"#B87333",	"#FF7518",	"#CC5500",	"#FFFF8F",	"#F0E68C",	"#FADA5E",	"#FFFAA0",	"#F8DE7E",	"#FDDA0D",	"#E1C16E"))+
+  labs(
+    x = NULL,
+    y = "Relative Abundance of Nematode Families",
+    fill = NULL
+  ) + 
+  theme_classic() +
+  theme(axis.text.x = element_text(angle = 45, hjust=1)) +
+  guides(fill = guide_legend(nrow = 61))
+```
+##Last analyses is looking at the distance based redundancy analyses for each major group 
+###Deciding whether to use diversity or richness as metrics in the analyses using correlations
+```{r correlations of all diversity metrics}
+biotic_cormap<-input_nem_ra$map_loaded[,43:50] 
+M=cor(biotic_cormap,use="pairwise.complete.obs")
+corrplot(M, method = 'number', type = 'upper',number.cex = 0.75,tl.cex = 0.75)
+```
+##We will use richness going forwarsd
+##These dbRDAs are split between the different habitat types
+###Start with bacteria 
+```{r bacteria dbRDA}
+## bacterial dbRDA for intact
+input_bact_ra_i = filter_data(input_bact_ra, filter_cat = "habitat", keep_vals = "Intact")
+bray = vegdist(t(input_bact_ra_i$data_loaded))
+
+# build model
+dbrda.m1<-dbrda(bray ~ gopher_tortoise_activity+Soil.pH+Nitrate+Ammonium+Calcium+Organic.Matter+Total.Organic.C+Gravimetric.H2O+Total.Phosphorus+fung_rich+prot_rich+mean_plant_rich,data=input_bact_ra_i$map_loaded, na.action = na.fail)
+# test significance of model terms
+anova.cca(dbrda.m1, by='term')
+
+map = input_bact_ra_i$map_loaded
+
+# Define point shapes and colors based on treatment group
+pchc <- c(21, 21)  # Different point shapes for different treatments
+colvec <- c("khaki3", "green4")  # Colors corresponding to treatments
+scl <- 2  # Scaling factor for the dbRDA plot
+
+# Create an empty plot to set up the axes limits
+plot(dbrda.m1, type = "n", scaling = scl, xlim = c(-4, 4), ylim = c(-3, 3))
+
+
+# Add text labels for the biplot (representing the explanatory variables)
+text(dbrda.m1, col = "gray", display = "bp")
+
+# Add a legend to the plot with point shapes and colors representing treatments
+map$treatment<-as.character(map$treatment)  
+map$treatment<-factor(map$treatment, levels=c("IntactBurrowing", "IntactForaging"))
+with(map, levels(map$treatment))
+
+map$treatment <- as.factor(map$treatment)
+
+with(map, 
+     legend(-4.2, 2, 
+            legend = levels(treatment),  # Treatment group names
+            bty = "n",             # No box around legend
+            col = colvec,          # Colors for treatments
+            pch = pchc,            # Point shapes for treatments
+            pt.bg = colvec         # Background colors for points in legend
+     ))
+
+# Add points for the sites using the treatment (treatment) groups from 'map'
+with(map, 
+     points(dbrda.m1, 
+            display = "sites", 
+            col = colvec[treatment],  # Color based on treatment variable
+            scaling = scl, 
+            pch = pchc[treatment],    # Shape based on treatment variable
+            bg = colvec[treatment])   # Background color for points
+)
+
+## bacterial dbRDA for degraded
+input_bact_ra_d = filter_data(input_bact_ra, filter_cat = "habitat", keep_vals = "Degraded")
+bray = vegdist(t(input_bact_ra_d$data_loaded))
+
+# build model
+dbrda.m1<-dbrda(bray ~ gopher_tortoise_activity+Soil.pH+Nitrate+Ammonium+Calcium+Organic.Matter+Total.Organic.C+Gravimetric.H2O+Total.Phosphorus+fung_rich+prot_rich+mean_plant_rich,data=input_bact_ra_d$map_loaded, na.action = na.fail)
+# test significance of model terms
+anova.cca(dbrda.m1, by='term')
+
+map = input_bact_ra_d$map_loaded
+
+# Define point shapes and colors based on treatment group
+pchc <- c(25, 25)  # Different point shapes for different treatments
+colvec <- c("khaki3","green4")  # Colors corresponding to treatments
+scl <- 2  # Scaling factor for the dbRDA plot
+
+# Create an empty plot to set up the axes limits
+plot(dbrda.m1, type = "n", scaling = scl, xlim = c(-4, 4), ylim = c(-3, 3))
+
+
+# Add text labels for the biplot (representing the explanatory variables)
+text(dbrda.m1, col = "gray", display = "bp")
+
+# Add a legend to the plot with point shapes and colors representing treatments
+map$treatment<-as.character(map$treatment)  
+map$treatment<-factor(map$treatment, levels=c("DegradedBurrowing", "DegradedForaging"))
+with(map, levels(map$treatment))
+
+map$treatment <- as.factor(map$treatment)
+
+with(map, 
+     legend(-4.2, 2, 
+            legend = levels(treatment),  # Treatment group names
+            bty = "n",             # No box around legend
+            col = colvec,          # Colors for treatments
+            pch = pchc,            # Point shapes for treatments
+            pt.bg = colvec         # Background colors for points in legend
+     ))
+
+# Add points for the sites using the treatment (treatment) groups from 'map'
+with(map, 
+     points(dbrda.m1, 
+            display = "sites", 
+            col = colvec[treatment],  # Color based on treatment variable
+            scaling = scl, 
+            pch = pchc[treatment],    # Shape based on treatment variable
+            bg = colvec[treatment])   # Background color for points
+)
+```
+###Then fungi
+```{r fungi dbRDA}
+# intact
+input_fung_ra_i = filter_data(input_fung_ra, filter_cat = "habitat", keep_vals = "Intact")
+bray = vegdist(t(input_fung_ra_i$data_loaded))
+
+# build model
+dbrda.m1<-dbrda(bray ~ gopher_tortoise_activity+Soil.pH+Nitrate+Ammonium+Calcium+Organic.Matter+Total.Organic.C+Gravimetric.H2O+Total.Phosphorus+bact_rich+prot_rich+mean_plant_rich,data=input_fung_ra_i$map_loaded, na.action = na.fail)
+# test significance of model terms
+anova.cca(dbrda.m1, by='term')
+
+map = input_fung_ra_i$map_loaded
+
+# Define point shapes and colors based on treatment group
+pchc <- c(21, 21)  # Different point shapes for different treatments
+colvec <- c("khaki3", "green4")  # Colors corresponding to treatments
+scl <- 2  # Scaling factor for the dbRDA plot
+
+# Create an empty plot to set up the axes limits
+plot(dbrda.m1, type = "n", scaling = scl, xlim = c(-4, 4), ylim = c(-3, 3))
+
+
+# Add text labels for the biplot (representing the explanatory variables)
+text(dbrda.m1, col = "gray", display = "bp")
+
+# Add a legend to the plot with point shapes and colors representing treatments
+map$treatment<-as.character(map$treatment)  
+map$treatment<-factor(map$treatment, levels=c("IntactBurrowing", "IntactForaging"))
+with(map, levels(map$treatment))
+
+map$treatment <- as.factor(map$treatment)
+
+with(map, 
+     legend(-4.2, 2, 
+            legend = levels(treatment),  # Treatment group names
+            bty = "n",             # No box around legend
+            col = colvec,          # Colors for treatments
+            pch = pchc,            # Point shapes for treatments
+            pt.bg = colvec         # Background colors for points in legend
+     ))
+
+# Add points for the sites using the treatment (treatment) groups from 'map'
+with(map, 
+     points(dbrda.m1, 
+            display = "sites", 
+            col = colvec[treatment],  # Color based on treatment variable
+            scaling = scl, 
+            pch = pchc[treatment],    # Shape based on treatment variable
+            bg = colvec[treatment])   # Background color for points
+)
+
+## fungal dbRDA for degraded
+input_fung_ra_d = filter_data(input_fung_ra, filter_cat = "habitat", keep_vals = "Degraded")
+bray = vegdist(t(input_fung_ra_d$data_loaded))
+
+# build model
+dbrda.m1<-dbrda(bray ~ gopher_tortoise_activity+Soil.pH+Nitrate+Ammonium+Calcium+Organic.Matter+Total.Organic.C+Gravimetric.H2O+Total.Phosphorus+bact_rich+prot_rich+mean_plant_rich,data=input_fung_ra_d$map_loaded, na.action = na.fail)
+# test significance of model terms
+anova.cca(dbrda.m1, by='term')
+
+map = input_fung_ra_d$map_loaded
+
+# Define point shapes and colors based on treatment group
+pchc <- c(25, 25)  # Different point shapes for different treatments
+colvec <- c("khaki3", "green4")  # Colors corresponding to treatments
+scl <- 2  # Scaling factor for the dbRDA plot
+
+# Create an empty plot to set up the axes limits
+plot(dbrda.m1, type = "n", scaling = scl, xlim = c(-4, 4), ylim = c(-3, 3))
+
+
+# Add text labels for the biplot (representing the explanatory variables)
+text(dbrda.m1, col = "gray", display = "bp")
+
+# Add a legend to the plot with point shapes and colors representing treatments
+map$treatment<-as.character(map$treatment)  
+map$treatment<-factor(map$treatment, levels=c("DegradedBurrowing", "DegradedForaging"))
+with(map, levels(map$treatment))
+
+map$treatment <- as.factor(map$treatment)
+
+with(map, 
+     legend(-4.2, 2, 
+            legend = levels(treatment),  # Treatment group names
+            bty = "n",             # No box around legend
+            col = colvec,          # Colors for treatments
+            pch = pchc,            # Point shapes for treatments
+            pt.bg = colvec         # Background colors for points in legend
+     ))
+
+# Add points for the sites using the treatment (treatment) groups from 'map'
+with(map, 
+     points(dbrda.m1, 
+            display = "sites", 
+            col = colvec[treatment],  # Color based on treatment variable
+            scaling = scl, 
+            pch = pchc[treatment],    # Shape based on treatment variable
+            bg = colvec[treatment])   # Background color for points
+)
+```
+###Then protists
+```{r protist dbRDA}
+# intact
+input_prot_ra_i = filter_data(input_prot_ra, filter_cat = "habitat", keep_vals = "Intact")
+bray = vegdist(t(input_prot_ra_i$data_loaded))
+
+# build model
+dbrda.m1<-dbrda(bray ~ gopher_tortoise_activity+Soil.pH+Nitrate+Ammonium+Calcium+Organic.Matter+Total.Organic.C+Gravimetric.H2O+Total.Phosphorus+bact_rich+fung_rich+mean_plant_rich,data=input_prot_ra_i$map_loaded, na.action = na.fail)
+# test significance of model terms
+anova.cca(dbrda.m1, by='term')
+
+map = input_prot_ra_i$map_loaded
+
+# Define point shapes and colors based on treatment group
+pchc <- c(21, 21)  # Different point shapes for different treatments
+colvec <- c("khaki3", "green4")  # Colors corresponding to treatments
+scl <- 2  # Scaling factor for the dbRDA plot
+
+# Create an empty plot to set up the axes limits
+plot(dbrda.m1, type = "n", scaling = scl, xlim = c(-4, 4), ylim = c(-3, 3))
+
+
+# Add text labels for the biplot (representing the explanatory variables)
+text(dbrda.m1, col = "gray", display = "bp")
+
+# Add a legend to the plot with point shapes and colors representing treatments
+map$treatment<-as.character(map$treatment)  
+map$treatment<-factor(map$treatment, levels=c("IntactBurrowing", "IntactForaging"))
+with(map, levels(map$treatment))
+
+map$treatment <- as.factor(map$treatment)
+
+with(map, 
+     legend(-4.2, 2, 
+            legend = levels(treatment),  # Treatment group names
+            bty = "n",             # No box around legend
+            col = colvec,          # Colors for treatments
+            pch = pchc,            # Point shapes for treatments
+            pt.bg = colvec         # Background colors for points in legend
+     ))
+
+# Add points for the sites using the treatment (treatment) groups from 'map'
+with(map, 
+     points(dbrda.m1, 
+            display = "sites", 
+            col = colvec[treatment],  # Color based on treatment variable
+            scaling = scl, 
+            pch = pchc[treatment],    # Shape based on treatment variable
+            bg = colvec[treatment])   # Background color for points
+)
+
+## protist dbRDA for degraded
+input_prot_ra_d_fp = filter_data(input_prot_ra, filter_cat = "sampleID", filter_vals = "F.10.A_F")
+input_prot_ra_d = filter_data(input_prot_ra_d_fp, filter_cat = "habitat", keep_vals = "Degraded")
+bray = vegdist(t(input_prot_ra_d$data_loaded))
+
+# build model
+dbrda.m1<-dbrda(bray ~ gopher_tortoise_activity+Soil.pH+Nitrate+Ammonium+Calcium+Organic.Matter+Total.Organic.C+Gravimetric.H2O+Total.Phosphorus+bact_rich+fung_rich+mean_plant_rich,data=input_prot_ra_d$map_loaded, na.action = na.fail)
+# test significance of model terms
+anova.cca(dbrda.m1, by='term')
+
+map = input_prot_ra_d$map_loaded
+
+# Define point shapes and colors based on treatment group
+pchc <- c(25, 25)  # Different point shapes for different treatments
+colvec <- c("khaki3", "green4")  # Colors corresponding to treatments
+scl <- 2  # Scaling factor for the dbRDA plot
+
+# Create an empty plot to set up the axes limits
+plot(dbrda.m1, type = "n", scaling = scl, xlim = c(-4, 4), ylim = c(-3, 3))
+
+
+# Add text labels for the biplot (representing the explanatory variables)
+text(dbrda.m1, col = "gray", display = "bp")
+
+# Add a legend to the plot with point shapes and colors representing treatments
+map$treatment<-as.character(map$treatment)  
+map$treatment<-factor(map$treatment, levels=c("DegradedBurrowing", "DegradedForaging"))
+with(map, levels(map$treatment))
+
+map$treatment <- as.factor(map$treatment)
+
+with(map, 
+     legend(-4.2, 2, 
+            legend = levels(treatment),  # Treatment group names
+            bty = "n",             # No box around legend
+            col = colvec,          # Colors for treatments
+            pch = pchc,            # Point shapes for treatments
+            pt.bg = colvec         # Background colors for points in legend
+     ))
+
+# Add points for the sites using the treatment (treatment) groups from 'map'
+with(map, 
+     points(dbrda.m1, 
+            display = "sites", 
+            col = colvec[treatment],  # Color based on treatment variable
+            scaling = scl, 
+            pch = pchc[treatment],    # Shape based on treatment variable
+            bg = colvec[treatment])   # Background color for points
+)
+```
+###Nematode dbRDAs split by trophic group
+```{r bacterial-feeding}
+## using only intact samples
+input_BF = filter_taxa_from_input(input_nem_ra, taxa_to_keep = "BF")
+input_BF_filt = filter_data(input_BF, filter_cat = 'sampleID',
+                            filter_vals = c("F.7.A_F", "S.3.A_F"))
+input_BF_filt_i = filter_data(input_BF_filt, filter_cat = "habitat",
+                              keep_vals = "Intact")
+bray = vegdist(t(input_BF_filt_i$data_loaded))
+
+# build model
+dbrda.m1<-dbrda(bray ~ gopher_tortoise_activity+Soil.pH+Nitrate+Ammonium+Calcium+Organic.Matter+Total.Organic.C+Gravimetric.H2O+Total.Phosphorus+bact_rich+fung_rich+prot_rich+mean_plant_rich,data=input_BF_filt_i$map_loaded, na.action = na.omit)
+
+# test significance of model terms
+anova.cca(dbrda.m1, by='term')
+
+map = input_BF_filt_i$map_loaded
+
+# Define point shapes and colors based on treatment group
+pchc <- c(21, 21)  # Different point shapes for different treatments
+colvec <- c("khaki3", "green4")  # Colors corresponding to treatments
+scl <- 2  # Scaling factor for the dbRDA plot
+
+# Create an empty plot to set up the axes limits
+plot(dbrda.m1, type = "n", scaling = scl, xlim = c(-4, 4), ylim = c(-3, 3))
+
+
+# Add text labels for the biplot (representing the explanatory variables)
+text(dbrda.m1, col = "gray", display = "bp")
+
+# Add a legend to the plot with point shapes and colors representing treatments
+map$treatment<-as.character(map$treatment)  
+map$treatment<-factor(map$treatment, levels=c("IntactBurrowing","IntactForaging"))
+with(map, levels(map$treatment))
+
+map$treatment <- as.factor(map$treatment)
+
+with(map, 
+     legend(-4.2, 2, 
+            legend = levels(treatment),  # Treatment group names
+            bty = "n",             # No box around legend
+            col = colvec,          # Colors for treatments
+            pch = pchc,            # Point shapes for treatments
+            pt.bg = colvec         # Background colors for points in legend
+     ))
+
+# Add points for the sites using the treatment (treatment) groups from 'map'
+with(map, 
+     points(dbrda.m1, 
+            display = "sites", 
+            col = colvec[treatment],  # Color based on treatment variable
+            scaling = scl, 
+            pch = pchc[treatment],    # Shape based on treatment variable
+            bg = colvec[treatment])   # Background color for points
+)
+
+## using only degraded samples
+input_BF_filt_d = filter_data(input_BF_filt, filter_cat = "habitat",
+                              keep_vals = "Degraded")
+bray = vegdist(t(input_BF_filt_d$data_loaded))
+
+# build model
+dbrda.m1<-dbrda(bray ~ gopher_tortoise_activity+Soil.pH+Nitrate+Ammonium+Calcium+Organic.Matter+Total.Organic.C+Gravimetric.H2O+Total.Phosphorus+bact_rich+fung_rich+prot_rich+mean_plant_rich,data=input_BF_filt_d$map_loaded, na.action = na.omit)
+
+# test significance of model terms
+anova.cca(dbrda.m1, by='term')
+
+map = input_BF_filt_d$map_loaded
+
+# Define point shapes and colors based on treatment group
+pchc <- c(25, 25)  # Different point shapes for different treatments
+colvec <- c("khaki3", "green4")  # Colors corresponding to treatments
+scl <- 2  # Scaling factor for the dbRDA plot
+
+# Create an empty plot to set up the axes limits
+plot(dbrda.m1, type = "n", scaling = scl, xlim = c(-4, 4), ylim = c(-3, 3))
+
+
+# Add text labels for the biplot (representing the explanatory variables)
+text(dbrda.m1, col = "gray", display = "bp")
+
+# Add a legend to the plot with point shapes and colors representing treatments
+map$treatment<-as.character(map$treatment)  
+map$treatment<-factor(map$treatment, levels=c("DegradedBurrowing","DegradedForaging"))
+with(map, levels(map$treatment))
+
+map$treatment <- as.factor(map$treatment)
+
+with(map, 
+     legend(-4.2, 2, 
+            legend = levels(treatment),  # Treatment group names
+            bty = "n",             # No box around legend
+            col = colvec,          # Colors for treatments
+            pch = pchc,            # Point shapes for treatments
+            pt.bg = colvec         # Background colors for points in legend
+     ))
+
+# Add points for the sites using the treatment (treatment) groups from 'map'
+with(map, 
+     points(dbrda.m1, 
+            display = "sites", 
+            col = colvec[treatment],  # Color based on treatment variable
+            scaling = scl, 
+            pch = pchc[treatment],    # Shape based on treatment variable
+            bg = colvec[treatment])   # Background color for points
+)
+```
+
+```{r fungal-feeding}
+## using only intact samples
+input_FF = filter_taxa_from_input(input_nem_ra, taxa_to_keep = "FF")
+input_FF_filt = filter_data(input_FF, filter_cat = 'sampleID',
+                            filter_vals = c("S.7.A_F", "S.8.A_F", "F.5.A_F",
+                                            "S.6.O_F", "F.7.A_F", "S.3.A_F"))
+input_FF_filt_i = filter_data(input_FF_filt, filter_cat = "habitat",
+                              keep_vals = "Intact")
+bray = vegdist(t(input_FF_filt_i$data_loaded))
+
+# build model
+dbrda.m1<-dbrda(bray ~ gopher_tortoise_activity+Soil.pH+Nitrate+Ammonium+Calcium+Organic.Matter+Total.Organic.C+Gravimetric.H2O+Total.Phosphorus+bact_rich+fung_rich+prot_rich+mean_plant_rich,data=input_FF_filt_i$map_loaded, na.action = na.omit)
+
+# test significance of model terms
+anova.cca(dbrda.m1, by='term')
+
+map = input_FF_filt_i$map_loaded
+
+# Define point shapes and colors based on treatment group
+pchc <- c(21, 21)  # Different point shapes for different treatments
+colvec <- c("khaki3", "green4")  # Colors corresponding to treatments
+scl <- 2  # Scaling factor for the dbRDA plot
+
+# Create an empty plot to set up the axes limits
+plot(dbrda.m1, type = "n", scaling = scl, xlim = c(-4, 4), ylim = c(-3, 3))
+
+
+# Add text labels for the biplot (representing the explanatory variables)
+text(dbrda.m1, col = "gray", display = "bp")
+
+# Add a legend to the plot with point shapes and colors representing treatments
+map$treatment<-as.character(map$treatment)  
+map$treatment<-factor(map$treatment, levels=c("IntactBurrowing","IntactForaging"))
+with(map, levels(map$treatment))
+
+map$treatment <- as.factor(map$treatment)
+
+with(map, 
+     legend(-4.2, 2, 
+            legend = levels(treatment),  # Treatment group names
+            bty = "n",             # No box around legend
+            col = colvec,          # Colors for treatments
+            pch = pchc,            # Point shapes for treatments
+            pt.bg = colvec         # Background colors for points in legend
+     ))
+
+# Add points for the sites using the treatment (treatment) groups from 'map'
+with(map, 
+     points(dbrda.m1, 
+            display = "sites", 
+            col = colvec[treatment],  # Color based on treatment variable
+            scaling = scl, 
+            pch = pchc[treatment],    # Shape based on treatment variable
+            bg = colvec[treatment])   # Background color for points
+)
+
+## using only degraded samples
+input_FF_filt_d = filter_data(input_FF_filt, filter_cat = "habitat",
+                              keep_vals = "Degraded")
+bray = vegdist(t(input_FF_filt_d$data_loaded))
+
+# build model
+dbrda.m1<-dbrda(bray ~ gopher_tortoise_activity+Soil.pH+Nitrate+Ammonium+Calcium+Organic.Matter+Total.Organic.C+Gravimetric.H2O+Total.Phosphorus+bact_rich+fung_rich+prot_rich+mean_plant_rich,data=input_FF_filt_d$map_loaded, na.action = na.omit)
+
+# test significance of model terms
+anova.cca(dbrda.m1, by='term')
+
+map = input_FF_filt_d$map_loaded
+
+# Define point shapes and colors based on treatment group
+pchc <- c(25, 25)  # Different point shapes for different treatments
+colvec <- c("khaki3", "green4")  # Colors corresponding to treatments
+scl <- 2  # Scaling factor for the dbRDA plot
+
+# Create an empty plot to set up the axes limits
+plot(dbrda.m1, type = "n", scaling = scl, xlim = c(-4, 4), ylim = c(-3, 3))
+
+
+# Add text labels for the biplot (representing the explanatory variables)
+text(dbrda.m1, col = "gray", display = "bp")
+
+# Add a legend to the plot with point shapes and colors representing treatments
+map$treatment<-as.character(map$treatment)  
+map$treatment<-factor(map$treatment, levels=c("DegradedBurrowing","DegradedForaging"))
+with(map, levels(map$treatment))
+
+map$treatment <- as.factor(map$treatment)
+
+with(map, 
+     legend(-4.2, 2, 
+            legend = levels(treatment),  # Treatment group names
+            bty = "n",             # No box around legend
+            col = colvec,          # Colors for treatments
+            pch = pchc,            # Point shapes for treatments
+            pt.bg = colvec         # Background colors for points in legend
+     ))
+
+# Add points for the sites using the treatment (treatment) groups from 'map'
+with(map, 
+     points(dbrda.m1, 
+            display = "sites", 
+            col = colvec[treatment],  # Color based on treatment variable
+            scaling = scl, 
+            pch = pchc[treatment],    # Shape based on treatment variable
+            bg = colvec[treatment])   # Background color for points
+)
+```
+
+```{r omnivorous}
+## using only intact samples
+input_OM = filter_taxa_from_input(input_nem_ra, taxa_to_keep = "OM")
+input_OM_filt = filter_data(input_OM, filter_cat = 'sampleID',
+                            filter_vals = c("S.9.O_F", "F.8.A_F", "F.5.A_F",
+                                            "S.3.A_F", "F.7.A_F", "S.6.O_F"))
+input_OM_filt_i = filter_data(input_OM_filt, filter_cat = "habitat",
+                              keep_vals = "Intact")
+bray = vegdist(t(input_OM_filt_i$data_loaded))
+
+# build model
+dbrda.m1<-dbrda(bray ~ gopher_tortoise_activity+Soil.pH+Nitrate+Ammonium+Calcium+Organic.Matter+Total.Organic.C+Gravimetric.H2O+Total.Phosphorus+bact_rich+fung_rich+prot_rich+mean_plant_rich,data=input_OM_filt_i$map_loaded, na.action = na.omit)
+
+# test significance of model terms
+anova.cca(dbrda.m1, by='term')
+
+map = input_OM_filt_i$map_loaded
+
+# Define point shapes and colors based on treatment group
+pchc <- c(21, 21)  # Different point shapes for different treatments
+colvec <- c("khaki3", "green4")  # Colors corresponding to treatments
+scl <- 2  # Scaling factor for the dbRDA plot
+
+# Create an empty plot to set up the axes limits
+plot(dbrda.m1, type = "n", scaling = scl, xlim = c(-4, 4), ylim = c(-3, 3))
+
+
+# Add text labels for the biplot (representing the explanatory variables)
+text(dbrda.m1, col = "gray", display = "bp")
+
+# Add a legend to the plot with point shapes and colors representing treatments
+map$treatment<-as.character(map$treatment)  
+map$treatment<-factor(map$treatment, levels=c("IntactBurrowing","IntactForaging"))
+with(map, levels(map$treatment))
+
+map$treatment <- as.factor(map$treatment)
+
+with(map, 
+     legend(-4.2, 2, 
+            legend = levels(treatment),  # Treatment group names
+            bty = "n",             # No box around legend
+            col = colvec,          # Colors for treatments
+            pch = pchc,            # Point shapes for treatments
+            pt.bg = colvec         # Background colors for points in legend
+     ))
+
+# Add points for the sites using the treatment (treatment) groups from 'map'
+with(map, 
+     points(dbrda.m1, 
+            display = "sites", 
+            col = colvec[treatment],  # Color based on treatment variable
+            scaling = scl, 
+            pch = pchc[treatment],    # Shape based on treatment variable
+            bg = colvec[treatment])   # Background color for points
+)
+
+## using only degraded samples
+input_OM_filt_d = filter_data(input_OM_filt, filter_cat = "habitat",
+                              keep_vals = "Degraded")
+bray = vegdist(t(input_OM_filt_d$data_loaded))
+
+# build model
+dbrda.m1<-dbrda(bray ~ gopher_tortoise_activity+Soil.pH+Nitrate+Ammonium+Calcium+Organic.Matter+Total.Organic.C+Gravimetric.H2O+Total.Phosphorus+bact_rich+fung_rich+prot_rich+mean_plant_rich,data=input_OM_filt_d$map_loaded, na.action = na.omit)
+
+# test significance of model terms
+anova.cca(dbrda.m1, by='term')
+
+map = input_OM_filt_d$map_loaded
+
+# Define point shapes and colors based on treatment group
+pchc <- c(25, 25)  # Different point shapes for different treatments
+colvec <- c("khaki3", "green4")  # Colors corresponding to treatments
+scl <- 2  # Scaling factor for the dbRDA plot
+
+# Create an empty plot to set up the axes limits
+plot(dbrda.m1, type = "n", scaling = scl, xlim = c(-4, 4), ylim = c(-3, 3))
+
+
+# Add text labels for the biplot (representing the explanatory variables)
+text(dbrda.m1, col = "gray", display = "bp")
+
+# Add a legend to the plot with point shapes and colors representing treatments
+map$treatment<-as.character(map$treatment)  
+map$treatment<-factor(map$treatment, levels=c("DegradedBurrowing","DegradedForaging"))
+with(map, levels(map$treatment))
+
+map$treatment <- as.factor(map$treatment)
+
+with(map, 
+     legend(-4.2, 2, 
+            legend = levels(treatment),  # Treatment group names
+            bty = "n",             # No box around legend
+            col = colvec,          # Colors for treatments
+            pch = pchc,            # Point shapes for treatments
+            pt.bg = colvec         # Background colors for points in legend
+     ))
+
+# Add points for the sites using the treatment (treatment) groups from 'map'
+with(map, 
+     points(dbrda.m1, 
+            display = "sites", 
+            col = colvec[treatment],  # Color based on treatment variable
+            scaling = scl, 
+            pch = pchc[treatment],    # Shape based on treatment variable
+            bg = colvec[treatment])   # Background color for points
+)
+```
+
+```{r plant-parasitic}
+## using only intact samples
+input_PP = filter_taxa_from_input(input_nem_ra, taxa_to_keep = "PP")
+input_PP_filt = filter_data(input_PP, filter_cat = 'sampleID',
+                            filter_vals = c("S.6.O_F"))
+input_PP_filt_i = filter_data(input_PP_filt, filter_cat = "habitat",
+                              keep_vals = "Intact")
+bray = vegdist(t(input_PP_filt_i$data_loaded))
+
+# build model
+dbrda.m1<-dbrda(bray ~ gopher_tortoise_activity+Soil.pH+Nitrate+Ammonium+Calcium+Organic.Matter+Total.Organic.C+Gravimetric.H2O+Total.Phosphorus+bact_rich+fung_rich+prot_rich+mean_plant_rich,data=input_PP_filt_i$map_loaded, na.action = na.omit)
+
+
+# test significance of model terms
+anova.cca(dbrda.m1, by='term')
+
+map = input_PP_filt_i$map_loaded
+
+# Define point shapes and colors based on treatment group
+pchc <- c(21, 21)  # Different point shapes for different treatments
+colvec <- c("khaki3", "green4")  # Colors corresponding to treatments
+scl <- 2  # Scaling factor for the dbRDA plot
+
+# Create an empty plot to set up the axes limits
+plot(dbrda.m1, type = "n", scaling = scl, xlim = c(-4, 4), ylim = c(-3, 3))
+
+
+# Add text labels for the biplot (representing the explanatory variables)
+text(dbrda.m1, col = "gray", display = "bp")
+
+# Add a legend to the plot with point shapes and colors representing treatments
+map$treatment<-as.character(map$treatment)  
+map$treatment<-factor(map$treatment, levels=c("IntactBurrowing","IntactForaging"))
+with(map, levels(map$treatment))
+
+map$treatment <- as.factor(map$treatment)
+
+with(map, 
+     legend(-4.2, 2, 
+            legend = levels(treatment),  # Treatment group names
+            bty = "n",             # No box around legend
+            col = colvec,          # Colors for treatments
+            pch = pchc,            # Point shapes for treatments
+            pt.bg = colvec         # Background colors for points in legend
+     ))
+
+# Add points for the sites using the treatment (treatment) groups from 'map'
+with(map, 
+     points(dbrda.m1, 
+            display = "sites", 
+            col = colvec[treatment],  # Color based on treatment variable
+            scaling = scl, 
+            pch = pchc[treatment],    # Shape based on treatment variable
+            bg = colvec[treatment])   # Background color for points
+)
+
+## using only degraded samples
+input_PP_filt_d = filter_data(input_PP_filt, filter_cat = "habitat",
+                              keep_vals = "Degraded")
+bray = vegdist(t(input_PP_filt_d$data_loaded))
+
+# build model
+dbrda.m1<-dbrda(bray ~ gopher_tortoise_activity+Soil.pH+Nitrate+Ammonium+Calcium+Organic.Matter+Total.Organic.C+Gravimetric.H2O+Total.Phosphorus+bact_rich+fung_rich+prot_rich+mean_plant_rich,data=input_PP_filt_d$map_loaded, na.action = na.omit)
+
+# test significance of model terms
+anova.cca(dbrda.m1, by='term')
+
+map = input_PP_filt_d$map_loaded
+
+# Define point shapes and colors based on treatment group
+pchc <- c(25, 25)  # Different point shapes for different treatments
+colvec <- c("khaki3", "green4")  # Colors corresponding to treatments
+scl <- 2  # Scaling factor for the dbRDA plot
+
+# Create an empty plot to set up the axes limits
+plot(dbrda.m1, type = "n", scaling = scl, xlim = c(-4, 4), ylim = c(-3, 3))
+
+
+# Add text labels for the biplot (representing the explanatory variables)
+text(dbrda.m1, col = "gray", display = "bp")
+
+# Add a legend to the plot with point shapes and colors representing treatments
+map$treatment<-as.character(map$treatment)  
+map$treatment<-factor(map$treatment, levels=c("DegradedBurrowing","DegradedForaging"))
+with(map, levels(map$treatment))
+
+map$treatment <- as.factor(map$treatment)
+
+with(map, 
+     legend(-4.2, 2, 
+            legend = levels(treatment),  # Treatment group names
+            bty = "n",             # No box around legend
+            col = colvec,          # Colors for treatments
+            pch = pchc,            # Point shapes for treatments
+            pt.bg = colvec         # Background colors for points in legend
+     ))
+
+# Add points for the sites using the treatment (treatment) groups from 'map'
+with(map, 
+     points(dbrda.m1, 
+            display = "sites", 
+            col = colvec[treatment],  # Color based on treatment variable
+            scaling = scl, 
+            pch = pchc[treatment],    # Shape based on treatment variable
+            bg = colvec[treatment])   # Background color for points
+)
+```
+
+```{r root-associated}
+## using only intact samples
+input_RA = filter_taxa_from_input(input_nem_ra, taxa_to_keep = "RA")
+input_RA_filt = filter_data(input_RA, filter_cat = 'sampleID',
+                            filter_vals = c("F.1.A_F", "F.3.A_F", "F.3.A_F",
+                                            "F.5.A_F", "F.6.A_F", "F.9.A_F",
+                                            "F.13.A_F", "F.1.O_F", "F.3.O_F",
+                                            "F.4.O_F", "F.5.O_F", "F.6.O_F",
+                                            "F.8.O_F", "F.9.O_F", "S.2.A_F",
+                                            "S.4.A_F", "S.5.A_F", "S.8.A_F",
+                                            "S.12.A_F", "S.9.O_F", "S.3.A_F",
+                                            "S.6.O_F", "F.7.A_F"))
+input_RA_filt_i = filter_data(input_RA_filt, filter_cat = "habitat",
+                              keep_vals = "Intact")
+bray = vegdist(t(input_RA_filt_i$data_loaded))
+
+# build model
+dbrda.m1<-dbrda(bray ~ gopher_tortoise_activity+Soil.pH+Nitrate+Ammonium+Calcium+Organic.Matter+Total.Organic.C+Gravimetric.H2O+Total.Phosphorus+bact_rich+fung_rich+prot_rich+mean_plant_rich,data=input_RA_filt_i$map_loaded, na.action = na.omit)
+
+# test significance of model terms
+anova.cca(dbrda.m1, by='term')
+
+map = input_RA_filt_i$map_loaded
+
+# Define point shapes and colors based on treatment group
+pchc <- c(21, 21)  # Different point shapes for different treatments
+colvec <- c("khaki3", "green4")  # Colors corresponding to treatments
+scl <- 2  # Scaling factor for the dbRDA plot
+
+# Create an empty plot to set up the axes limits
+plot(dbrda.m1, type = "n", scaling = scl, xlim = c(-4, 4), ylim = c(-3, 3))
+
+
+# Add text labels for the biplot (representing the explanatory variables)
+text(dbrda.m1, col = "gray", display = "bp")
+
+# Add a legend to the plot with point shapes and colors representing treatments
+map$treatment<-as.character(map$treatment)  
+map$treatment<-factor(map$treatment, levels=c("IntactBurrowing","IntactForaging"))
+with(map, levels(map$treatment))
+
+map$treatment <- as.factor(map$treatment)
+
+with(map, 
+     legend(-4.2, 2, 
+            legend = levels(treatment),  # Treatment group names
+            bty = "n",             # No box around legend
+            col = colvec,          # Colors for treatments
+            pch = pchc,            # Point shapes for treatments
+            pt.bg = colvec         # Background colors for points in legend
+     ))
+
+# Add points for the sites using the treatment (treatment) groups from 'map'
+with(map, 
+     points(dbrda.m1, 
+            display = "sites", 
+            col = colvec[treatment],  # Color based on treatment variable
+            scaling = scl, 
+            pch = pchc[treatment],    # Shape based on treatment variable
+            bg = colvec[treatment])   # Background color for points
+)
+
+## using only degraded samples
+input_RA_filt_d = filter_data(input_RA_filt, filter_cat = "habitat",
+                              keep_vals = "Degraded")
+
+bray = vegdist(t(input_RA_filt_d$data_loaded))
+
+# build model
+dbrda.m1<-dbrda(bray ~ gopher_tortoise_activity+Soil.pH+Nitrate+Ammonium+Calcium+Organic.Matter+Total.Organic.C+Gravimetric.H2O+Total.Phosphorus+bact_rich+fung_rich+prot_rich+mean_plant_rich,data=input_RA_filt_d$map_loaded, na.action = na.omit)
+
+# test significance of model terms
+anova.cca(dbrda.m1, by='term')
+
+map = input_RA_filt_d$map_loaded
+
+# Define point shapes and colors based on treatment group
+pchc <- c(25, 25)  # Different point shapes for different treatments
+colvec <- c("khaki3", "green4")  # Colors corresponding to treatments
+scl <- 2  # Scaling factor for the dbRDA plot
+
+# Create an empty plot to set up the axes limits
+plot(dbrda.m1, type = "n", scaling = scl, xlim = c(-4, 4), ylim = c(-3, 3))
+
+
+# Add text labels for the biplot (representing the explanatory variables)
+text(dbrda.m1, col = "gray", display = "bp")
+
+# Add a legend to the plot with point shapes and colors representing treatments
+map$treatment<-as.character(map$treatment)  
+map$treatment<-factor(map$treatment, levels=c("DegradedBurrowing","DegradedForaging"))
+with(map, levels(map$treatment))
+
+map$treatment <- as.factor(map$treatment)
+
+with(map, 
+     legend(-4.2, 2, 
+            legend = levels(treatment),  # Treatment group names
+            bty = "n",             # No box around legend
+            col = colvec,          # Colors for treatments
+            pch = pchc,            # Point shapes for treatments
+            pt.bg = colvec         # Background colors for points in legend
+     ))
+
+# Add points for the sites using the treatment (treatment) groups from 'map'
+with(map, 
+     points(dbrda.m1, 
+            display = "sites", 
+            col = colvec[treatment],  # Color based on treatment variable
+            scaling = scl, 
+            pch = pchc[treatment],    # Shape based on treatment variable
+            bg = colvec[treatment])   # Background color for points
+)
+```
