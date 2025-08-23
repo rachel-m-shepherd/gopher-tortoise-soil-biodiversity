@@ -399,6 +399,34 @@ ggplot(ord_plant_plot, aes(nmds1, nmds2, group = plant_mapping$habitat)) +
   theme_classic() + 
   labs(x="NMDS 1", y="NMDS 2") 
 ```
+##Qubit for microbial biomass
+```{r qubit/microbial biomass}
+Qubit.lm = lmer(Qubit ~ habitat*gopher_tortoise_activity +(1|site), data = map)
+anova(Qubit.lm)
+emmeans(Qubit.lm, pairwise~habitat*gopher_tortoise_activity)
+
+# plot
+map$treatment = factor(map$treatment, 
+                       levels = c("IntactBurrowing", "IntactForaging", "DegradedBurrowing", "DegradedForaging"))
+
+
+ggplot(map, aes(x = treatment, y = Qubit)) +
+  geom_boxplot(aes(fill = treatment), outlier.shape = NA,
+               color = c("black")) +    
+  geom_jitter(aes(fill = treatment),
+              alpha = 0.8,
+              shape = 21,
+              size = 3,
+              set.seed(666),
+              color = "black") +
+  scale_fill_manual(values = c("khaki", "green4","khaki","green4")) +
+  labs(x = NULL,
+       y = "Qubit",
+       title = NULL) +
+  theme_classic() +
+  theme(legend.position = "none") +
+  theme(plot.title = element_text(hjust = 0.5))
+```
 ##Analyses for soil alpha diversity metrics 
 ##Starting with microbial alpha diversity analyses
 ```{r microbial alhpa diversity models and figures}
