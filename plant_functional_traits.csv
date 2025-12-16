@@ -1,0 +1,85 @@
+﻿species,functional_group_short,functional_group,species_full
+ARST,G,Grass,Aristida stricta (Wiregrass)
+FORGRA,F,Forb,Forb Grass
+SCSC,G,Grass,Schizachryium scoparium (Little bluestem)
+DIAC,G,Grass,Dichanthelium aciculare (Needleleaf witchgrass)
+CYPSPP,G,Grass,Unknown sedge
+ERTO,F,Forb,Eriogonum tomentosum (Dogtongue wild buckwheat)
+PIGR,F,Forb,Pityopsis graminifolia (Narrowleaf silkgrass)
+QUGE,W,Woody,Quercus geminata (Sandhills live oak)
+CRAR,F,Forb,Croton argyranthemus (Silver croton)
+CHFL,L,Legume,Chapmannia floridana (Florida alicia)
+DISP,G,Grass,Dichanthelium spp.
+PASGRAA,G,Grass,#N/A
+CYRE,G,Grass,Cyperus retrorsus (Pine barren flatsedge)
+GRASS_B,G,Grass,Unknown grass
+DIVI,W,Woody,Diospyros virginiana (Common persimmon) 
+QULA,W,Woody,Quercus laevis (Turkey oak)
+CNST,F,Forb,Cnidoscolus stimulosus (Spurge nettle)
+CYDA,G,Grass,Cynodon dactylon (Bermuda grass)
+ASRE,W,Woody,Asimina reticulata (Netted pawpaw)
+PANO,G,Grass,Paspalum notatum (Bahia grass)
+HYPER,F,Forb,Hypericum
+RHCI,L,Legume,Rhynchosia cinera (Brownhair snoutbean)
+QUIN,W,Woody,Quercus incana (Bluejack oak)
+GARE,L,Legume,Downy milkpea; Probably incorrect ID because this species has not been observed at OS
+FLATSHEATH,G,Grass,Morpho spp flatsheath grass
+GAVO,L,Legume,Galactia volubilis (Eastern milkpea)
+EUCA,F,Forb,Eupatorium capillifolium (Dog fennel)
+LIMI,F,Forb,Licania michauxii (Gopher apple)
+REDLAN,F,Forb,"Red stem, lancelet leaf forb; May be the ""red stem, small leaf forb"" found at S10NB B on 7/19/2021."
+LONRED,G,Grass,"Unknown long leaf, red stem grass"
+BSGR,G,Grass,Unknown blue-silver grass
+EVESMA,F,Forb,Everything small
+PILGRA,G,Grass,Pine-like grass
+RSPL,F,Forb,"Red stem, pine like forb"
+TECH,L,Legume,Tephrosia chrysophylla (Scurf hoarypea)
+QUSPP,W,Woody,Quercus spp
+PURPBASELEAF,G,Grass,Purple base and leaf grass
+SSF,F,Forb,#N/A
+BTLF,F,Forb,Branching thin leafed forb
+SRTL,L,Legume,"Very small, reddish vines, tight three leaves"
+LRLE,F,Forb,"Low rosette, looks like lambs ear"
+GRASS_F,G,Grass,Circular stem broad grass
+SMILSPP,L,Legume,Looks like Smilax spp
+MLFO,F,Forb,Mint-like forb
+ERAR,F,Forb,Eryngium aromaticum (Fragrant eryngo)
+SLBF,F,Forb,Small leaf branching forb
+VESS,G,Grass,Very small sedge
+CRRO,L,Legume,Crotalaria rotundifolia (Rabbitbell)
+BUTTSPP,F,Forb,"Probably BTLF, maybe buttonweed"
+CHROSPP,F,Forb,Chrosanthemum?
+CRFA,F,Forb,#N/A
+CHFA,L,Legume,Chamaecrista fasciculata (Partridge pea)
+YUCCASPP,F,Forb,Common yucca?
+CACTUS,F,Forb,Cactus (Prickly pear); Called PPCA in some plots
+STUF,F,Forb,"Sample taken, unique flower"
+PCLL,L,Legume,Pinnately compound long leaf forb
+TLFO,F,Forb,"Two leafed forb; ovate leaves, strange leaves on stem (see picture)"
+GRASS_H,G,Grass,"Spindly, red base/tip/seed grass"
+PAVI,G,Grass,Panicum virgatum (Switchgrass)
+GRASS_I,G,Grass,Bushy circular stem grass
+RALF,F,Forb,Rough alternating leaves forb
+RSSF,F,Forb,Red stem spindly forb
+MIMSPP,L,Legume,Mimosa spp
+LAMSPP,F,Forb,Lamiaceae spp
+LIATRUS,F,Forb,Liatrus spp
+ERCA,F,Forb,Horseweed
+ASAN,W,Woody,Narrowleaf pawpaw
+STSY,F,Forb,Stillingia sylvatica (Queen's delight)
+YUCCA,F,Forb,Common yucca?
+RHCO,W,Woody,Rhus copallinum (Winged sumac)
+DTLF,L,Legume,Dark trifoliate forb-like legume
+DIST,G,Grass,Dichanthelium strigulosa
+SLCG,G,Grass,Stiff leaf cluster grass
+NPLF,F,Forb,New pine like forb
+COER,F,Forb,Commelina erecta (Whitemouth dayflower)
+CROSPP,F,Forb,CROTALARIA?
+PTAQ,F,Forb,Pteridium aquilinum (Bracken fern)
+CLOVERQ,L,Legume,Hugging ground like moss or lichen
+GRASS_J,G,Grass,"Bushy, long stalk"
+VACCINIUM,W,Woody,Vaccinium spp
+NOTED_GRASS,G,Grass,bushy tall grass
+PIPA,W,Woody,Pinus palustris (Longleaf pine)
+QUMR,W,Woody,Quercus margarettae
+VLRL,W,Woody,Veiny large round leaf
